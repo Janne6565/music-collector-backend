@@ -1,9 +1,12 @@
 package com.musiccollector.services.sync;
 
 import com.musiccollector.entity.CopyEntity;
+import com.musiccollector.entity.WishlistItemEntity;
 import com.musiccollector.model.core.SyncCopyDto;
 import com.musiccollector.model.core.SyncPullDto;
+import com.musiccollector.model.core.SyncWishDto;
 import com.musiccollector.repository.CopyRepository;
+import com.musiccollector.repository.WishlistItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,18 +41,37 @@ public class SyncService {
     private static final TypeReference<Map<String, String>> CLOCKS = new TypeReference<>() {};
 
     private final CopyRepository copyRepository;
+    private final WishlistItemRepository wishlistItemRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public SyncPullDto pull(UUID userId, long since) {
-        List<CopyEntity> changed =
+        List<CopyEntity> changedCopies =
                 copyRepository.findAllByUserIdAndSyncSeqGreaterThanOrderBySyncSeqAsc(userId, since);
+        List<WishlistItemEntity> changedWishes =
+                wishlistItemRepository.findAllByUserIdAndSyncSeqGreaterThanOrderBySyncSeqAsc(userId, since);
 
-        boolean hasMore = changed.size() > PULL_PAGE_SIZE;
-        List<CopyEntity> page = hasMore ? changed.subList(0, PULL_PAGE_SIZE) : changed;
+        boolean hasMore = changedCopies.size() > PULL_PAGE_SIZE || changedWishes.size() > PULL_PAGE_SIZE;
+        List<CopyEntity> copyPage =
+                changedCopies.size() > PULL_PAGE_SIZE ? changedCopies.subList(0, PULL_PAGE_SIZE) : changedCopies;
+        List<WishlistItemEntity> wishPage =
+                changedWishes.size() > PULL_PAGE_SIZE ? changedWishes.subList(0, PULL_PAGE_SIZE) : changedWishes;
 
-        long cursor = page.isEmpty() ? since : page.getLast().getSyncSeq();
-        return new SyncPullDto(page.stream().map(this::toDto).toList(), cursor, hasMore);
+        // The cursor is the lowest of the two high-water marks, so a page that truncated one
+        // kind cannot advance past records of the other kind that were never sent.
+        long cursor = since;
+        if (!copyPage.isEmpty() || !wishPage.isEmpty()) {
+            long copyMax = copyPage.isEmpty() ? Long.MAX_VALUE : copyPage.getLast().getSyncSeq();
+            long wishMax = wishPage.isEmpty() ? Long.MAX_VALUE : wishPage.getLast().getSyncSeq();
+            cursor = Math.min(copyMax, wishMax);
+        }
+
+        final long limit = cursor;
+        return new SyncPullDto(
+                copyPage.stream().filter(copy -> copy.getSyncSeq() <= limit).map(this::toDto).toList(),
+                wishPage.stream().filter(wish -> wish.getSyncSeq() <= limit).map(this::toWishDto).toList(),
+                limit,
+                hasMore);
     }
 
     /**
@@ -57,9 +79,24 @@ public class SyncService {
      * results, so the client can adopt whatever the server decided.
      */
     @Transactional
-    public SyncPullDto push(UUID userId, List<SyncCopyDto> incoming) {
+    public SyncPullDto push(UUID userId, List<SyncCopyDto> incoming, List<SyncWishDto> incomingWishes) {
+        Pushed<SyncCopyDto> copies = pushCopies(userId, incoming);
+        Pushed<SyncWishDto> wishes = pushWishes(userId, incomingWishes);
+        return new SyncPullDto(
+                copies.records(), wishes.records(), Math.max(copies.highWaterMark(), wishes.highWaterMark()), false);
+    }
+
+    /**
+     * The merged records plus the highest sequence written.
+     *
+     * Returned rather than kept in a field: this service is a singleton, so per-request
+     * state on the instance would be shared by every concurrent request.
+     */
+    private record Pushed<T>(List<T> records, long highWaterMark) {}
+
+    private Pushed<SyncCopyDto> pushCopies(UUID userId, List<SyncCopyDto> incoming) {
         if (incoming.isEmpty()) {
-            return new SyncPullDto(List.of(), 0, false);
+            return new Pushed<>(List.of(), 0);
         }
 
         List<UUID> ids = incoming.stream().map(copy -> UUID.fromString(copy.id())).toList();
@@ -69,7 +106,7 @@ public class SyncService {
         }
 
         List<SyncCopyDto> results = new ArrayList<>(incoming.size());
-        long cursor = 0;
+        long highWaterMark = 0;
 
         for (SyncCopyDto client : incoming) {
             UUID id = UUID.fromString(client.id());
@@ -84,12 +121,74 @@ public class SyncService {
             target.setSyncSeq(copyRepository.nextSyncSeq());
             copyRepository.save(target);
 
-            cursor = Math.max(cursor, target.getSyncSeq());
+            highWaterMark = Math.max(highWaterMark, target.getSyncSeq());
             results.add(merged);
         }
 
         log.debug("Merged {} copies for user {}", results.size(), userId);
-        return new SyncPullDto(results, cursor, false);
+        return new Pushed<>(results, highWaterMark);
+    }
+
+    private Pushed<SyncWishDto> pushWishes(UUID userId, List<SyncWishDto> incoming) {
+        if (incoming.isEmpty()) {
+            return new Pushed<>(List.of(), 0);
+        }
+
+        List<UUID> ids = incoming.stream().map(wish -> UUID.fromString(wish.id())).toList();
+        Map<UUID, WishlistItemEntity> stored = new HashMap<>();
+        for (WishlistItemEntity entity : wishlistItemRepository.findAllByUserIdAndIdIn(userId, ids)) {
+            stored.put(entity.getId(), entity);
+        }
+
+        List<SyncWishDto> results = new ArrayList<>(incoming.size());
+        long highWaterMark = 0;
+        for (SyncWishDto client : incoming) {
+            UUID id = UUID.fromString(client.id());
+            WishlistItemEntity entity = stored.get(id);
+            SyncWishDto merged = WishMerge.merge(entity == null ? null : toWishDto(entity), client);
+
+            WishlistItemEntity target = entity;
+            if (target == null) {
+                target = new WishlistItemEntity();
+                target.setId(id);
+                target.setUserId(userId);
+            }
+            applyWish(target, merged);
+            target.setSyncSeq(copyRepository.nextSyncSeq());
+            wishlistItemRepository.save(target);
+
+            highWaterMark = Math.max(highWaterMark, target.getSyncSeq());
+            results.add(merged);
+        }
+
+        log.debug("Merged {} wishes for user {}", results.size(), userId);
+        return new Pushed<>(results, highWaterMark);
+    }
+
+    private void applyWish(WishlistItemEntity entity, SyncWishDto dto) {
+        entity.setReleaseGroupMbid(dto.releaseGroupMbid());
+        entity.setTitle(dto.title() == null ? "Untitled" : dto.title());
+        entity.setArtistName(dto.artistName() == null ? "Unknown artist" : dto.artistName());
+        entity.setYear(dto.year());
+        entity.setDesiredFormat(dto.desiredFormat());
+        entity.setNote(dto.note());
+        entity.setCreatedAt(dto.createdAt());
+        entity.setDeletedAt(dto.deletedAt());
+        entity.setFieldClocks(writeClocks(dto.fieldClocks()));
+    }
+
+    private SyncWishDto toWishDto(WishlistItemEntity entity) {
+        return new SyncWishDto(
+                entity.getId().toString(),
+                entity.getReleaseGroupMbid(),
+                entity.getTitle(),
+                entity.getArtistName(),
+                entity.getYear(),
+                entity.getDesiredFormat(),
+                entity.getNote(),
+                entity.getCreatedAt(),
+                entity.getDeletedAt(),
+                readClocks(entity.getFieldClocks()));
     }
 
     private CopyEntity newEntity(UUID id, UUID userId) {

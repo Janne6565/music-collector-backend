@@ -25,6 +25,7 @@ public class SyncController implements SyncApi {
 
     @Override
     public ResponseEntity<SyncPullDto> push(SyncPushRequest request) {
-        return ResponseEntity.ok(syncService.push(currentUser.require().getId(), request.copies()));
+        return ResponseEntity.ok(
+                syncService.push(currentUser.require().getId(), request.safeCopies(), request.safeWishes()));
     }
 }
