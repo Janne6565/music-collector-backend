@@ -123,8 +123,19 @@ outstanding work, not a decision.
 3. **Accounts + sync** — auth, the shared merge with cross-language fixtures,
    `/api/v1/sync`, the first-sign-in prompt. *Done, except image upload — there is no photo
    capture yet to upload, so it moves to the phase that adds one.*
-4. **Remaining screens** — wishlist, profile and stats, the web sidebar layout, sleeve
-   photos and their upload, and surfacing `notesConflict` in the detail screens.
+4. **Remaining screens** — wishlist, profile and stats, the web sidebar layout, and
+   surfacing `notesConflict` in the detail screens. *Done.*
+5. **Sleeve photos** — camera capture and picker on mobile, upload to MinIO, and the
+   per-image upload state that a half-synced photo needs. Not started; this is the one
+   part of the original design still missing.
+
+`WishlistItem` carries field clocks exactly like `Copy`, and both push in one request
+under a single pending set — a session that added a record and wished for another must
+not race two calls.
+
+The pull cursor must never advance past a record the response did not include. Clamping
+it unconditionally to the lower of the two record kinds strands the other kind on the
+server while `hasMore` claims the client is up to date.
 
 Phases 2 and 3 being separable is the main dividend of local-first: sync cannot block the
 app from being useful.
