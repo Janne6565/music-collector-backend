@@ -125,9 +125,19 @@ outstanding work, not a decision.
    capture yet to upload, so it moves to the phase that adds one.*
 4. **Remaining screens** — wishlist, profile and stats, the web sidebar layout, and
    surfacing `notesConflict` in the detail screens. *Done.*
-5. **Sleeve photos** — camera capture and picker on mobile, upload to MinIO, and the
-   per-image upload state that a half-synced photo needs. Not started; this is the one
-   part of the original design still missing.
+5. **Sleeve photos** — camera capture and picker on mobile, a file picker on the web,
+   upload to MinIO, and per-image upload state. *Done.* The whole of the original design
+   is now built.
+
+Photos follow the same bargain as the collection: one taken with no account stays on the
+device and still renders. The bytes never travel inside a sync batch — that would make
+every sync as slow as the largest photo in it — so they move over dedicated endpoints and
+the sync payload carries only metadata. Bytes upload *before* the metadata is pushed,
+because a photo record with no storage key is one other devices can see but never fetch.
+
+Storage is the shared cluster MinIO with a bucket and a scoped user per environment,
+rather than a StatefulSet per namespace. Two more stateful workloads on a single node is a
+poor trade for isolation that credentials already provide.
 
 `WishlistItem` carries field clocks exactly like `Copy`, and both push in one request
 under a single pending set — a session that added a record and wished for another must
