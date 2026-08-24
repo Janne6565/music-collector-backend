@@ -76,16 +76,32 @@ Three things this forces:
    removes that failure mode for about forty lines of code.
 2. **`notes` is the weak spot.** Field-level LWW still discards one side's paragraph whole.
    On a genuine conflict, keep both and mark it rather than pick a winner.
-3. **The server is a merge participant**, not just storage: `field_clocks` JSONB per row,
-   client-generated UUIDv7 primary keys, `deleted_at` tombstones on every synced table.
+3. **The server is a merge participant**, not just storage: field clocks stored per row,
+   client-generated ids, `deleted_at` tombstones.
 
 Protocol: `GET /api/v1/sync?since=<cursor>` pulls, `POST /api/v1/sync` pushes a batch.
-Both sides fold with the same merge function.
+Both sides fold with the same merge function. The cursor is a **sequence**, not a
+timestamp — a timestamp cursor would suffer exactly the clock skew that motivated the
+hybrid logical clocks in the first place.
 
-**The merge function is written once and shared** — a small TypeScript package consumed by
-web and mobile, plus a mirrored Java implementation, with committed cross-language fixtures
-proving the two agree. Wharf does the same for its vault format. Divergent merge
-implementations are the classic way this bug class ships.
+Two traps found by testing, both of which lose data:
+
+- Pulling must look the local record up **including tombstones**. With a
+  tombstone-hiding lookup, a deleted copy looks like one the client has never seen, the
+  server's live version is adopted wholesale, and every delete comes back on the next sync.
+- A delete is an ordinary **stamped** write of a tombstone. An unstamped one loses every
+  merge, so the store deliberately exposes no unclocked delete at all.
+
+**The merge is written once and shared.** `merge-fixture.json` is hand-authored and
+committed to all three repositories; the TypeScript and Java implementations are each
+tested against it, three ways per case — the expected result, commutativity, and
+idempotence. Hand-authored rather than generated, so no implementation's bugs can quietly
+become the contract.
+
+The shared files (`hlc.ts`, `types.ts`, `copyWrites.ts`, `merge.ts`, `LocalStore.ts`,
+`theme.ts`, `syncEngine.ts`) are currently **duplicated** between the two frontends with
+MIRROR headers saying to change them together. Extracting them into a real package is
+outstanding work, not a decision.
 
 ## Anonymous mode details
 
@@ -101,13 +117,14 @@ implementations are the classic way this bug class ships.
 
 ## Phases
 
-1. **Scaffold** — four repos, CI to ghcr.io, ArgoCD app, hello-world green in staging.
+1. **Scaffold** — four repos, CI to ghcr.io, ArgoCD app, hello-world green in staging. *Done.*
 2. **Local-first core, no accounts at all** — `LocalStore` on both platforms, domain model,
-   metadata proxy, and add → library → detail working end-to-end anonymously. The app is
-   genuinely useful at the end of this phase.
-3. **Accounts + sync** — auth, the shared merge function with cross-language fixtures,
-   `/api/v1/sync`, the first-sign-in prompt, image upload.
-4. **Remaining screens** — wishlist, profile and stats, the web sidebar layout.
+   metadata proxy, and add → library → detail working end-to-end anonymously. *Done.*
+3. **Accounts + sync** — auth, the shared merge with cross-language fixtures,
+   `/api/v1/sync`, the first-sign-in prompt. *Done, except image upload — there is no photo
+   capture yet to upload, so it moves to the phase that adds one.*
+4. **Remaining screens** — wishlist, profile and stats, the web sidebar layout, sleeve
+   photos and their upload, and surfacing `notesConflict` in the detail screens.
 
 Phases 2 and 3 being separable is the main dividend of local-first: sync cannot block the
 app from being useful.
