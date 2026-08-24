@@ -15,6 +15,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  mvc:
+    problemdetails:
+      # RFC 7807 for framework-raised errors too, not just BaseException.
+      enabled: true
 
 music-collector:
   version: ${MC_VERSION:dev}
