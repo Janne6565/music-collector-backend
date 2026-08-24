@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,21 +31,27 @@ public interface AuthApi {
     @ApiResponse(responseCode = "200", description = "Account created and signed in")
     @ApiResponse(responseCode = "409", description = "That e-mail is already registered")
     @ApiResponse(responseCode = "429", description = "Too many attempts")
-    ResponseEntity<SessionDto> register(@Valid @RequestBody RegisterRequest request);
+    ResponseEntity<SessionDto> register(
+            @Valid @RequestBody RegisterRequest request,
+            @RequestHeader(name = "X-Token-Mode", required = false) String tokenMode);
 
     @PostMapping("/login")
     @Operation(summary = "Sign in", description = "Also sets the refresh cookie.")
     @ApiResponse(responseCode = "200", description = "Signed in")
     @ApiResponse(responseCode = "401", description = "Wrong e-mail or password")
     @ApiResponse(responseCode = "429", description = "Too many attempts")
-    ResponseEntity<SessionDto> login(@Valid @RequestBody LoginRequest request);
+    ResponseEntity<SessionDto> login(
+            @Valid @RequestBody LoginRequest request,
+            @RequestHeader(name = "X-Token-Mode", required = false) String tokenMode);
 
     @PostMapping("/refresh")
     @Operation(summary = "Exchange the refresh cookie for a new access token")
     @ApiResponse(responseCode = "200", description = "A fresh access token")
     @ApiResponse(responseCode = "401", description = "No valid refresh cookie")
     ResponseEntity<SessionDto> refresh(
-            @CookieValue(name = "mc_refresh", required = false) String refreshToken);
+            @CookieValue(name = "mc_refresh", required = false) String cookieToken,
+            @RequestHeader(name = "X-Refresh-Token", required = false) String bodyToken,
+            @RequestHeader(name = "X-Token-Mode", required = false) String tokenMode);
 
     @PostMapping("/logout")
     @Operation(

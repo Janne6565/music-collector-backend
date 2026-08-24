@@ -4,6 +4,7 @@ import com.musiccollector.controller.v1.schema.AuthApi;
 import com.musiccollector.model.action.LoginRequest;
 import com.musiccollector.model.action.RegisterRequest;
 import com.musiccollector.model.core.SessionDto;
+import com.musiccollector.model.core.TokenMode;
 import com.musiccollector.model.core.UserDto;
 import com.musiccollector.security.CurrentUser;
 import com.musiccollector.services.auth.AuthService;
@@ -22,20 +23,23 @@ public class AuthController implements AuthApi {
     private final CurrentUser currentUser;
 
     @Override
-    public ResponseEntity<SessionDto> register(RegisterRequest request) {
-        return withRefreshCookie(authService.register(request));
+    public ResponseEntity<SessionDto> register(RegisterRequest request, String tokenMode) {
+        return deliver(authService.register(request), TokenMode.fromHeader(tokenMode));
     }
 
     @Override
-    public ResponseEntity<SessionDto> login(LoginRequest request) {
-        return withRefreshCookie(authService.login(request));
+    public ResponseEntity<SessionDto> login(LoginRequest request, String tokenMode) {
+        return deliver(authService.login(request), TokenMode.fromHeader(tokenMode));
     }
 
     @Override
-    public ResponseEntity<SessionDto> refresh(String refreshToken) {
-        // Reissued on every refresh, so an active session's cookie keeps sliding forward
-        // rather than expiring mid-use.
-        return withRefreshCookie(authService.refresh(refreshToken));
+    public ResponseEntity<SessionDto> refresh(String cookieToken, String bodyToken, String tokenMode) {
+        TokenMode mode = TokenMode.fromHeader(tokenMode);
+        // A native client has no cookie, so it sends the token it stored instead.
+        String presented = mode == TokenMode.DIRECT ? bodyToken : cookieToken;
+        // Reissued on every refresh, so an active session keeps sliding forward rather
+        // than expiring mid-use.
+        return deliver(authService.refresh(presented), mode);
     }
 
     @Override
@@ -51,7 +55,11 @@ public class AuthController implements AuthApi {
         return ResponseEntity.ok(AuthService.toDto(currentUser.require()));
     }
 
-    private ResponseEntity<SessionDto> withRefreshCookie(AuthService.Session session) {
+    private ResponseEntity<SessionDto> deliver(AuthService.Session session, TokenMode mode) {
+        if (mode == TokenMode.DIRECT) {
+            SessionDto body = session.body();
+            return ResponseEntity.ok(new SessionDto(body.accessToken(), session.refreshToken(), body.user()));
+        }
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookieFactory.create(session.refreshToken()).toString())
                 .body(session.body());

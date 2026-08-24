@@ -100,9 +100,10 @@ public class AuthService {
     }
 
     private Session issue(UserEntity user) {
-        return new Session(
-                new SessionDto(jwtService.issueAccessToken(user), toDto(user)),
-                jwtService.issueRefreshToken(user));
+        String refreshToken = jwtService.issueRefreshToken(user);
+        // The body's refreshToken is filled in by the controller only for DIRECT clients;
+        // browsers get it as a cookie and must not see it here.
+        return new Session(new SessionDto(jwtService.issueAccessToken(user), null, toDto(user)), refreshToken);
     }
 
     /** The body the client sees, plus the refresh token the controller turns into a cookie. */
