@@ -84,7 +84,9 @@ public class MetadataService {
                         .flatMap(this::persist))
                 .orElseThrow(() -> new ReleaseNotFoundException(mbid));
 
-        if (entity.getDominantColor() == null) {
+        // Skipped once we know there is no cover: without this the palette fetch runs on
+        // every single lookup of an artless release, and always comes back empty.
+        if (entity.getDominantColor() == null && !Boolean.FALSE.equals(entity.getHasCoverArt())) {
             applyCoverPalette(entity);
         }
         return toDto(entity);
@@ -119,6 +121,10 @@ public class MetadataService {
         entity.setCountry(release.country());
         entity.setBarcode(release.barcode());
         entity.setCoverArtUrl(coverArtClient.frontCoverUrl(release.id()));
+        // A lookup tells us whether there is a front cover; a search does not mention it at
+        // all. Null is therefore "not asked yet", not "no cover" — see toDto.
+        entity.setHasCoverArt(
+                release.coverArtArchive() == null ? null : release.coverArtArchive().front());
         entity.setFetchedAt(Instant.now());
         return Optional.of(releaseRepository.save(entity));
     }
@@ -139,18 +145,26 @@ public class MetadataService {
         });
     }
 
+    /**
+     * Samples the cover for its palette, and records whether there was a cover at all.
+     *
+     * The fetch answers both questions at once, so a release that reaches here stops being
+     * "unknown" either way — that is what lets the search-persisted rows, which MusicBrainz
+     * never told us about, eventually get a truthful answer.
+     */
     private void applyCoverPalette(ReleaseEntity entity) {
-        coverArtClient
-                .fetchThumbnail(entity.getMbid().toString())
-                .flatMap(colorExtractor::extract)
-                .ifPresent(palette -> {
-                    entity.setDominantColor(palette.dominantColor());
-                    entity.setAccentColor(palette.accentColor());
-                    entity.setLightness(palette.lightness());
-                    releaseRepository.save(entity);
-                    log.debug("Sampled cover for {}: {} (lightness {})",
-                            entity.getMbid(), palette.dominantColor(), palette.lightness());
-                });
+        Optional<byte[]> thumbnail = coverArtClient.fetchThumbnail(entity.getMbid().toString());
+        entity.setHasCoverArt(thumbnail.isPresent());
+
+        thumbnail.flatMap(colorExtractor::extract).ifPresentOrElse(palette -> {
+            entity.setDominantColor(palette.dominantColor());
+            entity.setAccentColor(palette.accentColor());
+            entity.setLightness(palette.lightness());
+            log.debug("Sampled cover for {}: {} (lightness {})",
+                    entity.getMbid(), palette.dominantColor(), palette.lightness());
+        }, () -> log.debug("No cover art for release {}", entity.getMbid()));
+
+        releaseRepository.save(entity);
     }
 
     private ReleaseDto toDto(ReleaseEntity entity) {

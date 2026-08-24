@@ -57,6 +57,13 @@ public class ReleaseEntity {
     @Column(name = "cover_art_url")
     private String coverArtUrl;
 
+    /**
+     * Whether the Cover Art Archive actually has a front cover. Null until something has
+     * asked — a release persisted from a search has not been probed yet.
+     */
+    @Column(name = "has_cover_art")
+    private Boolean hasCoverArt;
+
     @Column(name = "dominant_color")
     private String dominantColor;
 

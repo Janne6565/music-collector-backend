@@ -1,10 +1,13 @@
 package com.musiccollector.services.metadata;
 
 import com.musiccollector.client.MusicBrainzResponses;
+import com.musiccollector.entity.ReleaseEntity;
+import com.musiccollector.model.core.Format;
 import com.musiccollector.model.core.Format;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,7 +27,8 @@ class MetadataMapperTest {
                 credits,
                 new MusicBrainzResponses.ReleaseGroup("b0a6f7a4-0000-4000-8000-000000000002", "Remain in Light", "1980"),
                 labels,
-                media);
+                media,
+                null);
     }
 
     @Test
@@ -89,5 +93,32 @@ class MetadataMapperTest {
     void reportsNoLabelRatherThanFailing() {
         assertThat(MetadataMapper.label(release(null, null, null, "1980"))).isNull();
         assertThat(MetadataMapper.catalogNumber(release(null, List.of(), null, "1980"))).isNull();
+    }
+
+    @Test
+    void withholdsTheCoverUrlOnlyWhenItIsKnownToBeEmpty() {
+        // The URL is built from the mbid and exists whether or not the archive holds any
+        // bytes, so a definite "no cover" has to be the only thing that nulls it out.
+        assertThat(MetadataMapper.toDto(releaseEntity(Boolean.FALSE), GROUP).coverArtUrl()).isNull();
+        assertThat(MetadataMapper.toDto(releaseEntity(Boolean.TRUE), GROUP).coverArtUrl()).isEqualTo(COVER_URL);
+        // Unknown is not a no: a release persisted from a search has never been probed, and
+        // hiding a cover that does exist is the worse of the two mistakes.
+        assertThat(MetadataMapper.toDto(releaseEntity(null), GROUP).coverArtUrl()).isEqualTo(COVER_URL);
+    }
+
+    private static final UUID GROUP = UUID.fromString("b0a6f7a4-0000-4000-8000-000000000002");
+    private static final String COVER_URL =
+            "https://coverartarchive.org/release/b0a6f7a4-0000-4000-8000-000000000001/front-500";
+
+    private static ReleaseEntity releaseEntity(Boolean hasCoverArt) {
+        ReleaseEntity entity = new ReleaseEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setMbid(UUID.fromString("b0a6f7a4-0000-4000-8000-000000000001"));
+        entity.setTitle("Remain in Light");
+        entity.setArtistName("Talking Heads");
+        entity.setFormat(Format.VINYL);
+        entity.setCoverArtUrl(COVER_URL);
+        entity.setHasCoverArt(hasCoverArt);
+        return entity;
     }
 }
