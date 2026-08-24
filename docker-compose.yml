@@ -1,0 +1,15 @@
+# Local Postgres for development. The app itself runs from your IDE or `mvn spring-boot:run`.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: musiccollector
+      POSTGRES_USER: musiccollector
+      POSTGRES_PASSWORD: musiccollector
+    ports:
+      - "5432:5432"
+    volumes:
+      - musiccollector-pgdata:/var/lib/postgresql/data
+
+volumes:
+  musiccollector-pgdata:
