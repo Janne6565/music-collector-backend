@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
@@ -46,14 +47,15 @@ public class JwtService {
                 .compact();
     }
 
-    public String issueRefreshToken(UserEntity user) {
+    public String issueRefreshToken(UserEntity user, boolean remember) {
         // Minimal: a long-lived token should carry no more than it needs to be exchanged.
+        Duration ttl = remember ? properties.refreshTokenTtl() : properties.sessionRefreshTokenTtl();
         return Jwts.builder()
                 .subject(user.getId().toString())
                 .claim(CLAIM_TOKEN_TYPE, TokenType.REFRESH.name())
                 .claim(CLAIM_TOKEN_VERSION, user.getTokenVersion())
                 .issuedAt(Date.from(Instant.now()))
-                .expiration(Date.from(Instant.now().plus(properties.refreshTokenTtl())))
+                .expiration(Date.from(Instant.now().plus(ttl)))
                 .signWith(key)
                 .compact();
     }

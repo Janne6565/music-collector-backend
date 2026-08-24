@@ -10,7 +10,7 @@ import org.springframework.web.client.RestClient;
 import java.time.Duration;
 
 @Configuration
-@EnableConfigurationProperties({MusicBrainzProperties.class, JwtProperties.class})
+@EnableConfigurationProperties({MusicBrainzProperties.class, JwtProperties.class, OAuthProperties.class})
 public class MetadataClientConfig {
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);

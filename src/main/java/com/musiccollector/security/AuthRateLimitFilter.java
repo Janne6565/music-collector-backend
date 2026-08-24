@@ -31,6 +31,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(AuthRateLimitFilter.class);
     private static final String REGISTER = "/api/v1/auth/register";
     private static final String LOGIN = "/api/v1/auth/login";
+    /** Sends mail to an address the caller chose, so it needs the same restraint. */
+    private static final String FORGOT = "/api/v1/auth/forgot-password";
 
     private final Cache<String, Bucket> buckets =
             Caffeine.newBuilder().maximumSize(50_000).expireAfterAccess(Duration.ofMinutes(30)).build();
@@ -43,7 +45,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return !(REGISTER.equals(path) || LOGIN.equals(path));
+        return !(REGISTER.equals(path) || LOGIN.equals(path) || FORGOT.equals(path));
     }
 
     @Override

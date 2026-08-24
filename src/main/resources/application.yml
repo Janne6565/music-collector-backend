@@ -32,10 +32,41 @@ music-collector:
     secret: ${MC_JWT_SECRET}
     access-token-ttl: PT15M
     refresh-token-ttl: P30D
+    # Used when "keep me signed in" is off — one sitting, not a month.
+    session-refresh-token-ttl: PT12H
   auth:
     # Off only for local HTTP development.
     cookie-secure: ${MC_COOKIE_SECURE:true}
     attempts-per-hour: 20
+  mail:
+    base-url: ${MC_MAIL_BASE_URL:http://mail-service.mailservice.svc.cluster.local:8080}
+    # Blank disables sending: reset links are logged instead. That is the local default, so
+    # nothing can mail a real person from a laptop by accident.
+    api-key: ${MC_MAIL_API_KEY:}
+    public-url: ${MC_PUBLIC_URL:http://localhost:5173}
+  oauth:
+    public-base-url: ${MC_PUBLIC_URL:http://localhost:5173}
+    # A provider appears on the sign-in screen only when its credentials are set, so an
+    # unconfigured one is invisible rather than a button that fails.
+    providers:
+      google:
+        display-name: Google
+        client-id: ${MC_OAUTH_GOOGLE_CLIENT_ID:}
+        client-secret: ${MC_OAUTH_GOOGLE_CLIENT_SECRET:}
+        authorize-url: https://accounts.google.com/o/oauth2/v2/auth
+        token-url: https://oauth2.googleapis.com/token
+        user-info-url: https://openidconnect.googleapis.com/v1/userinfo
+        scope: openid email profile
+      apple:
+        display-name: Apple
+        client-id: ${MC_OAUTH_APPLE_CLIENT_ID:}
+        # The contents of the .p8 key, not a static secret — Apple wants a signed JWT.
+        client-secret: ${MC_OAUTH_APPLE_KEY:}
+        team-id: ${MC_OAUTH_APPLE_TEAM_ID:}
+        key-id: ${MC_OAUTH_APPLE_KEY_ID:}
+        authorize-url: https://appleid.apple.com/auth/authorize
+        token-url: https://appleid.apple.com/auth/token
+        scope: openid email name
   storage:
     endpoint: ${MC_MINIO_ENDPOINT:http://localhost:9000}
     access-key: ${MC_MINIO_ACCESS_KEY:musiccollector}

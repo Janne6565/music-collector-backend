@@ -32,6 +32,10 @@ public class UserEntity {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    /** What the app calls you. Null for accounts made before there was a field for it. */
+    @Column(name = "display_name")
+    private String displayName;
+
     /**
      * Bumped to revoke every outstanding refresh token for this user at once. A refresh
      * token carrying an older version is rejected, so "sign out everywhere" is one write.

@@ -18,4 +18,6 @@ public record JwtProperties(
         @NotBlank @Size(min = 32, message = "The JWT secret must be at least 32 characters")
         String secret,
         @NotNull Duration accessTokenTtl,
-        @NotNull Duration refreshTokenTtl) {}
+        @NotNull Duration refreshTokenTtl,
+        /** Used when "keep me signed in" is off: long enough for one sitting, no more. */
+        @NotNull Duration sessionRefreshTokenTtl) {}

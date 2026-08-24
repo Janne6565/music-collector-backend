@@ -1,0 +1,51 @@
+package com.musiccollector.controller.v1.schema;
+
+import com.musiccollector.model.core.AuthProviderDto;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
+
+/**
+ * Signing in with an external provider.
+ *
+ * <p>The provider only authenticates the first step; the app then issues its own tokens,
+ * exactly as a password login does, so nothing downstream knows how someone signed in.
+ */
+@RequestMapping("/api/v1/auth")
+@Tag(name = "Auth")
+public interface OAuthApi {
+
+    @GetMapping("/providers")
+    @Operation(
+            summary = "Sign-in providers this server can actually use",
+            description = "Only providers with credentials configured. Clients render a button per "
+                    + "entry, so an unconfigured provider is absent rather than broken.")
+    @ApiResponse(responseCode = "200", description = "The available providers, possibly none")
+    ResponseEntity<List<AuthProviderDto>> providers();
+
+    @GetMapping("/oauth/{provider}/authorize")
+    @Operation(
+            summary = "Begin an external sign-in",
+            description = "Redirects to the provider. Navigate to this, never fetch it.")
+    @ApiResponse(responseCode = "302", description = "Redirect to the provider")
+    ResponseEntity<Void> authorize(@PathVariable String provider);
+
+    @GetMapping("/oauth/{provider}/callback")
+    @Operation(
+            summary = "Where the provider sends the person back",
+            description = "Sets the refresh cookie and redirects into the app. No token ever "
+                    + "appears in a URL.")
+    @ApiResponse(responseCode = "302", description = "Redirect into the app")
+    ResponseEntity<Void> callback(
+            @PathVariable String provider,
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String error);
+}

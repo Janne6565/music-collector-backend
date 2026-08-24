@@ -1,13 +1,16 @@
 package com.musiccollector.controller.v1.implementation;
 
 import com.musiccollector.controller.v1.schema.AuthApi;
+import com.musiccollector.model.action.ForgotPasswordRequest;
 import com.musiccollector.model.action.LoginRequest;
 import com.musiccollector.model.action.RegisterRequest;
+import com.musiccollector.model.action.ResetPasswordRequest;
 import com.musiccollector.model.core.SessionDto;
 import com.musiccollector.model.core.TokenMode;
 import com.musiccollector.model.core.UserDto;
 import com.musiccollector.security.CurrentUser;
 import com.musiccollector.services.auth.AuthService;
+import com.musiccollector.services.auth.PasswordResetService;
 import com.musiccollector.services.auth.RefreshCookieFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController implements AuthApi {
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
     private final RefreshCookieFactory refreshCookieFactory;
     private final CurrentUser currentUser;
 
@@ -37,9 +41,23 @@ public class AuthController implements AuthApi {
         TokenMode mode = TokenMode.fromHeader(tokenMode);
         // A native client has no cookie, so it sends the token it stored instead.
         String presented = mode == TokenMode.DIRECT ? bodyToken : cookieToken;
-        // Reissued on every refresh, so an active session keeps sliding forward rather
-        // than expiring mid-use.
-        return deliver(authService.refresh(presented), mode);
+        // A cookie that arrived with no Max-Age is a session cookie, so this sign-in chose
+        // not to be remembered; reissuing it as durable would quietly override that.
+        boolean remember = mode == TokenMode.DIRECT || cookieToken != null;
+        return deliver(authService.refresh(presented, remember), mode);
+    }
+
+    @Override
+    public ResponseEntity<Void> forgotPassword(ForgotPasswordRequest request) {
+        passwordResetService.request(request.email());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<SessionDto> resetPassword(ResetPasswordRequest request, String tokenMode) {
+        return deliver(
+                authService.issueFor(passwordResetService.redeem(request.token(), request.password())),
+                TokenMode.fromHeader(tokenMode));
     }
 
     @Override
@@ -61,7 +79,9 @@ public class AuthController implements AuthApi {
             return ResponseEntity.ok(new SessionDto(body.accessToken(), session.refreshToken(), body.user()));
         }
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, refreshCookieFactory.create(session.refreshToken()).toString())
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        refreshCookieFactory.create(session.refreshToken(), session.remember()).toString())
                 .body(session.body());
     }
 }

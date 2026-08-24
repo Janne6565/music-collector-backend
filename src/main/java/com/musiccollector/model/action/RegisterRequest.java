@@ -8,4 +8,6 @@ public record RegisterRequest(
         @NotBlank @Email @Size(max = 254) String email,
         // Length only. Composition rules push people towards predictable substitutions
         // without adding real strength.
-        @NotBlank @Size(min = 10, max = 200, message = "Use at least 10 characters") String password) {}
+        @NotBlank @Size(min = 10, max = 200, message = "Use at least 10 characters") String password,
+        /** Optional: someone who would rather not give a name still gets an account. */
+        @Size(max = 120) String displayName) {}

@@ -48,13 +48,15 @@ public class AuthService {
         user.setId(UUID.randomUUID());
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
+        String displayName = request.displayName() == null ? null : request.displayName().trim();
+        user.setDisplayName(displayName == null || displayName.isEmpty() ? null : displayName);
         user.setTokenVersion(0);
         user.setCreatedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
 
         log.debug("Registered user {}", user.getId());
-        return issue(user);
+        return issue(user, true);
     }
 
     @Transactional(readOnly = true)
@@ -64,14 +66,17 @@ public class AuthService {
             passwordEncoder.matches(request.password(), passwordEncoder.encode(TIMING_EQUALISER_PASSWORD));
             throw new InvalidCredentialsException();
         }
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        // An account created through a provider has no password. Comparing against null
+        // would throw; refusing tells the person nothing about which case they hit.
+        if (user.getPasswordHash() == null
+                || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new InvalidCredentialsException();
         }
-        return issue(user);
+        return issue(user, request.remember());
     }
 
     @Transactional(readOnly = true)
-    public Session refresh(String refreshToken) {
+    public Session refresh(String refreshToken, boolean remember) {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new NotAuthenticatedException();
         }
@@ -83,7 +88,16 @@ public class AuthService {
                         // version and is refused here.
                         .filter(candidate -> candidate.getTokenVersion() == parsed.tokenVersion()))
                 .orElseThrow(NotAuthenticatedException::new);
-        return issue(user);
+        // A refresh keeps whatever lifetime the original sign-in chose: the presented token
+        // proves nothing about that choice, so re-reading it from the request would let a
+        // client silently upgrade a session cookie into a month-long one.
+        return issue(user, remember);
+    }
+
+    /** Signs in a user the caller has already authenticated some other way. */
+    @Transactional(readOnly = true)
+    public Session issueFor(UserEntity user) {
+        return issue(user, true);
     }
 
     /** Invalidates every outstanding refresh token for this user, on every device. */
@@ -96,16 +110,16 @@ public class AuthService {
     }
 
     public static UserDto toDto(UserEntity user) {
-        return new UserDto(user.getId(), user.getEmail(), user.getCreatedAt());
+        return new UserDto(user.getId(), user.getEmail(), user.getDisplayName(), user.getCreatedAt());
     }
 
-    private Session issue(UserEntity user) {
-        String refreshToken = jwtService.issueRefreshToken(user);
+    private Session issue(UserEntity user, boolean remember) {
+        String refreshToken = jwtService.issueRefreshToken(user, remember);
         // The body's refreshToken is filled in by the controller only for DIRECT clients;
         // browsers get it as a cookie and must not see it here.
-        return new Session(new SessionDto(jwtService.issueAccessToken(user), null, toDto(user)), refreshToken);
+        return new Session(new SessionDto(jwtService.issueAccessToken(user), null, toDto(user)), refreshToken, remember);
     }
 
     /** The body the client sees, plus the refresh token the controller turns into a cookie. */
-    public record Session(SessionDto body, String refreshToken) {}
+    public record Session(SessionDto body, String refreshToken, boolean remember) {}
 }

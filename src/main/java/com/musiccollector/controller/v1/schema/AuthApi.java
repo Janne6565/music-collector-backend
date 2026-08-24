@@ -1,7 +1,9 @@
 package com.musiccollector.controller.v1.schema;
 
+import com.musiccollector.model.action.ForgotPasswordRequest;
 import com.musiccollector.model.action.LoginRequest;
 import com.musiccollector.model.action.RegisterRequest;
+import com.musiccollector.model.action.ResetPasswordRequest;
 import com.musiccollector.model.core.SessionDto;
 import com.musiccollector.model.core.UserDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,6 +61,25 @@ public interface AuthApi {
             description = "Clears the refresh cookie and invalidates all outstanding refresh tokens.")
     @ApiResponse(responseCode = "204", description = "Signed out")
     ResponseEntity<Void> logout();
+
+    @PostMapping("/forgot-password")
+    @Operation(
+            summary = "Send a password reset link",
+            description = "Always answers 204, whether or not the address has an account — "
+                    + "a different answer would turn this into a way to find out who is registered.")
+    @ApiResponse(responseCode = "204", description = "Handled")
+    @ApiResponse(responseCode = "429", description = "Too many attempts")
+    ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request);
+
+    @PostMapping("/reset-password")
+    @Operation(
+            summary = "Redeem a reset link and sign in",
+            description = "Revokes every other session, since a reset may be locking somebody out.")
+    @ApiResponse(responseCode = "200", description = "Password changed and signed in")
+    @ApiResponse(responseCode = "400", description = "The link is expired, used, or not valid")
+    ResponseEntity<SessionDto> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request,
+            @RequestHeader(name = "X-Token-Mode", required = false) String tokenMode);
 
     @GetMapping("/me")
     @Operation(summary = "The signed-in account")

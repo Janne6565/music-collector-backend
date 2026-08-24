@@ -30,8 +30,13 @@ public class RefreshCookieFactory {
         this.secure = secure;
     }
 
-    public ResponseCookie create(String refreshToken) {
-        return base(refreshToken).maxAge(maxAge).build();
+    /**
+     * A remembered session gets a dated cookie; one that is not gets a session cookie with
+     * no Max-Age, which the browser drops when it closes.
+     */
+    public ResponseCookie create(String refreshToken, boolean remember) {
+        ResponseCookie.ResponseCookieBuilder builder = base(refreshToken);
+        return remember ? builder.maxAge(maxAge).build() : builder.build();
     }
 
     /** An expired cookie of the same name and path, which is how a cookie is removed. */
