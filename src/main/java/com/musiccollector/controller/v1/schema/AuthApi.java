@@ -1,0 +1,61 @@
+package com.musiccollector.controller.v1.schema;
+
+import com.musiccollector.model.action.LoginRequest;
+import com.musiccollector.model.action.RegisterRequest;
+import com.musiccollector.model.core.SessionDto;
+import com.musiccollector.model.core.UserDto;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+
+/**
+ * Accounts, which are entirely optional.
+ *
+ * The app works with no account at all — everything lives on the device. Signing in adds
+ * cross-device sync and nothing else, so none of these endpoints gate any feature.
+ */
+@RequestMapping("/api/v1/auth")
+@Tag(name = "Auth")
+public interface AuthApi {
+
+    @PostMapping("/register")
+    @Operation(summary = "Create an account", description = "Also sets the refresh cookie.")
+    @ApiResponse(responseCode = "200", description = "Account created and signed in")
+    @ApiResponse(responseCode = "409", description = "That e-mail is already registered")
+    @ApiResponse(responseCode = "429", description = "Too many attempts")
+    ResponseEntity<SessionDto> register(@Valid @RequestBody RegisterRequest request);
+
+    @PostMapping("/login")
+    @Operation(summary = "Sign in", description = "Also sets the refresh cookie.")
+    @ApiResponse(responseCode = "200", description = "Signed in")
+    @ApiResponse(responseCode = "401", description = "Wrong e-mail or password")
+    @ApiResponse(responseCode = "429", description = "Too many attempts")
+    ResponseEntity<SessionDto> login(@Valid @RequestBody LoginRequest request);
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Exchange the refresh cookie for a new access token")
+    @ApiResponse(responseCode = "200", description = "A fresh access token")
+    @ApiResponse(responseCode = "401", description = "No valid refresh cookie")
+    ResponseEntity<SessionDto> refresh(
+            @CookieValue(name = "mc_refresh", required = false) String refreshToken);
+
+    @PostMapping("/logout")
+    @Operation(
+            summary = "Sign out on every device",
+            description = "Clears the refresh cookie and invalidates all outstanding refresh tokens.")
+    @ApiResponse(responseCode = "204", description = "Signed out")
+    ResponseEntity<Void> logout();
+
+    @GetMapping("/me")
+    @Operation(summary = "The signed-in account")
+    @ApiResponse(responseCode = "200", description = "The account")
+    @ApiResponse(responseCode = "401", description = "Not signed in")
+    ResponseEntity<UserDto> me();
+}

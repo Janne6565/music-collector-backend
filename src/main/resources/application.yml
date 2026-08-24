@@ -27,6 +27,10 @@ music-collector:
     secret: ${MC_JWT_SECRET}
     access-token-ttl: PT15M
     refresh-token-ttl: P30D
+  auth:
+    # Off only for local HTTP development.
+    cookie-secure: ${MC_COOKIE_SECURE:true}
+    attempts-per-hour: 20
   musicbrainz:
     base-url: https://musicbrainz.org/ws/2
     cover-art-base-url: https://coverartarchive.org
