@@ -37,9 +37,69 @@ public class MusicBrainzClient {
         return search("release", query, limit);
     }
 
+    /**
+     * Artists matching a name.
+     *
+     * The artist index is the only one that can answer "who is this?" — the release index
+     * matches on title, so a bare band name there returns records *called* that name and
+     * nothing by the band. It also scores usefully: an exact name lands at 100 and
+     * substring matches trail well below, which is what lets the caller tell "Daughter"
+     * from "Anyone's Daughter".
+     */
+    public List<MusicBrainzResponses.Artist> searchArtists(String query, int limit) {
+        pacer.awaitSlot();
+        try {
+            MusicBrainzResponses.ArtistSearchResponse response = restClient
+                    .get()
+                    .uri(uri -> uri.path("/artist")
+                            .queryParam("query", query)
+                            .queryParam("limit", limit)
+                            .queryParam("fmt", "json")
+                            .build())
+                    .retrieve()
+                    .body(MusicBrainzResponses.ArtistSearchResponse.class);
+            if (response == null || response.artists() == null) {
+                return List.of();
+            }
+            log.debug("MusicBrainz artist search '{}' returned {}", query, response.artists().size());
+            return response.artists();
+        } catch (RestClientException e) {
+            throw new UpstreamUnavailableException("MusicBrainz", e);
+        }
+    }
+
+    /** Albums (release groups), with the total the query matched — used for the type counts. */
+    public MusicBrainzResponses.ReleaseGroupSearchResponse searchReleaseGroups(String query, int limit) {
+        pacer.awaitSlot();
+        try {
+            MusicBrainzResponses.ReleaseGroupSearchResponse response = restClient
+                    .get()
+                    .uri(uri -> uri.path("/release-group")
+                            .queryParam("query", query)
+                            .queryParam("limit", limit)
+                            .queryParam("fmt", "json")
+                            .build())
+                    .retrieve()
+                    .body(MusicBrainzResponses.ReleaseGroupSearchResponse.class);
+            return response == null
+                    ? new MusicBrainzResponses.ReleaseGroupSearchResponse(0, List.of())
+                    : response;
+        } catch (RestClientException e) {
+            throw new UpstreamUnavailableException("MusicBrainz", e);
+        }
+    }
+
     public List<MusicBrainzResponses.Release> findByBarcode(String barcode) {
         // Quoted so a barcode is matched as one term rather than tokenised by Lucene.
         return search("release", "barcode:\"" + barcode + "\"", 25);
+    }
+
+    /**
+     * Every pressing of one album. Bitches Brew has 47 of them, so the caller pages rather
+     * than pretending the list is short.
+     */
+    public List<MusicBrainzResponses.Release> findReleasesInGroup(String releaseGroupMbid, int limit) {
+        return search("release", "rgid:" + releaseGroupMbid, limit);
     }
 
     private List<MusicBrainzResponses.Release> search(String resource, String query, int limit) {

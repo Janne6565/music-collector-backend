@@ -2,6 +2,8 @@ package com.musiccollector.services.metadata;
 
 import com.musiccollector.client.MusicBrainzResponses;
 import com.musiccollector.entity.ReleaseEntity;
+import com.musiccollector.model.core.AlbumDto;
+import com.musiccollector.model.core.ArtistDto;
 import com.musiccollector.model.core.Format;
 import com.musiccollector.model.core.Format;
 import org.junit.jupiter.api.Test;
@@ -25,9 +27,11 @@ class MetadataMapperTest {
                 "US",
                 "075992609524",
                 credits,
-                new MusicBrainzResponses.ReleaseGroup("b0a6f7a4-0000-4000-8000-000000000002", "Remain in Light", "1980"),
+                new MusicBrainzResponses.ReleaseGroup(
+                        "b0a6f7a4-0000-4000-8000-000000000002", "Remain in Light", "1980", "Album", null),
                 labels,
                 media,
+                null,
                 null);
     }
 
@@ -64,7 +68,7 @@ class MetadataMapperTest {
 
     @Test
     void takesTheFormatFromTheFirstMedium() {
-        var media = List.of(new MusicBrainzResponses.Medium("12\" Vinyl"), new MusicBrainzResponses.Medium("CD"));
+        var media = List.of(new MusicBrainzResponses.Medium("12\" Vinyl", null, null), new MusicBrainzResponses.Medium("CD", null, null));
 
         assertThat(MetadataMapper.format(release(null, null, media, "1980"))).isEqualTo(Format.VINYL);
     }
@@ -104,6 +108,78 @@ class MetadataMapperTest {
         // Unknown is not a no: a release persisted from a search has never been probed, and
         // hiding a cover that does exist is the worse of the two mistakes.
         assertThat(MetadataMapper.toDto(releaseEntity(null), GROUP).coverArtUrl()).isEqualTo(COVER_URL);
+    }
+
+    @Test
+    void carriesTheDisambiguationThatTellsTwoArtistsApart() {
+        // MusicBrainz holds several artists called "Daughter". Without this line a row for
+        // the UK band is indistinguishable from a row for the punk band or the Japanese one.
+        var artist = new MusicBrainzResponses.Artist(
+                "f9a1f0f0-0000-4000-8000-000000000003",
+                "Daughter",
+                "UK indie folk band fronted by Elena Tonra",
+                "Group",
+                "GB",
+                100,
+                new MusicBrainzResponses.LifeSpan("2010", null, false));
+
+        ArtistDto dto = MetadataMapper.toArtistDto(artist);
+
+        assertThat(dto.name()).isEqualTo("Daughter");
+        assertThat(dto.disambiguation()).isEqualTo("UK indie folk band fronted by Elena Tonra");
+        assertThat(dto.type()).isEqualTo("Group");
+        assertThat(dto.beganIn()).isEqualTo("2010");
+        assertThat(dto.endedIn()).isNull();
+        assertThat(dto.score()).isEqualTo(100);
+    }
+
+    @Test
+    void givesAnArtistWithNoDisambiguationAnEmptyOneRatherThanNull() {
+        var artist = new MusicBrainzResponses.Artist(
+                "f9a1f0f0-0000-4000-8000-000000000004", "Talking Heads", null, null, null, 92, null);
+
+        // A client would otherwise have to guard every render of it.
+        assertThat(MetadataMapper.toArtistDto(artist).disambiguation()).isEmpty();
+    }
+
+    @Test
+    void dropsAnArtistWithNothingToIdentifyIt() {
+        assertThat(MetadataMapper.toArtistDto(null)).isNull();
+        assertThat(MetadataMapper.toArtistDto(
+                        new MusicBrainzResponses.Artist(null, "Nameless", null, null, null, null, null)))
+                .isNull();
+    }
+
+    @Test
+    void takesTheAlbumsYearFromItsFirstRelease() {
+        var group = new MusicBrainzResponses.ReleaseGroup(
+                "a9e30282-0000-4000-8000-000000000005",
+                "Bitches Brew",
+                "1970-03-30",
+                "Album",
+                List.of(new MusicBrainzResponses.ArtistCredit("Miles Davis", null)));
+
+        AlbumDto album = MetadataMapper.toAlbumDto(group, "https://example.test/front-500");
+
+        assertThat(album.title()).isEqualTo("Bitches Brew");
+        assertThat(album.artistName()).isEqualTo("Miles Davis");
+        assertThat(album.year()).isEqualTo(1970);
+        assertThat(album.primaryType()).isEqualTo("Album");
+    }
+
+    @Test
+    void countsDiscsAcrossEveryMedium() {
+        // A 2xLP is one release with two discs, and the pressing table says so.
+        var twoDiscs = List.of(new MusicBrainzResponses.Medium("12\" Vinyl", 2, 6));
+        assertThat(MetadataMapper.discCount(release(null, null, twoDiscs, "1970"))).isEqualTo(2);
+
+        // A medium that does not report a disc count is still a disc.
+        var unreported = List.of(
+                new MusicBrainzResponses.Medium("CD", null, 9),
+                new MusicBrainzResponses.Medium("DVD", null, 3));
+        assertThat(MetadataMapper.discCount(release(null, null, unreported, "1999"))).isEqualTo(2);
+
+        assertThat(MetadataMapper.discCount(release(null, null, null, "1970"))).isNull();
     }
 
     private static final UUID GROUP = UUID.fromString("b0a6f7a4-0000-4000-8000-000000000002");

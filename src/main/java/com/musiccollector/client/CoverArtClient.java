@@ -33,6 +33,16 @@ public class CoverArtClient {
         return baseUrl + "/release/" + releaseMbid + "/front-500";
     }
 
+    /**
+     * The album's cover, rather than one pressing's.
+     *
+     * A discography row is an album, and picking one of its 47 pressings just to have
+     * something to show would be arbitrary. The archive resolves this per release group.
+     */
+    public String frontCoverUrlForGroup(String releaseGroupMbid) {
+        return baseUrl + "/release-group/" + releaseGroupMbid + "/front-500";
+    }
+
     /** The 250px thumbnail, used only for sampling the palette. */
     public Optional<byte[]> fetchThumbnail(String releaseMbid) {
         try {

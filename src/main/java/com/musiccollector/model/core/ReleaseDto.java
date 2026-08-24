@@ -20,6 +20,10 @@ public record ReleaseDto(
         String catalogNumber,
         String country,
         String barcode,
+        /** Partial dates are normal here: "1970", "1970-03" and "1970-03-30" all occur. */
+        String releaseDate,
+        Integer trackCount,
+        Integer discCount,
         String coverArtUrl,
         CoverThemeDto coverTheme) {
 

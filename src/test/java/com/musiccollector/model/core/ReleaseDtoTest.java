@@ -12,7 +12,7 @@ class ReleaseDtoTest {
         return new ReleaseDto(
                 UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 "Remain in Light", "Talking Heads", 1980, Format.VINYL,
-                label, catalogNumber, country, null, null, null);
+                label, catalogNumber, country, null, null, null, null, null, null);
     }
 
     @Test

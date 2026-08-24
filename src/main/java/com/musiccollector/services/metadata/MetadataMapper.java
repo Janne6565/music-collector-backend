@@ -2,6 +2,8 @@ package com.musiccollector.services.metadata;
 
 import com.musiccollector.client.MusicBrainzResponses;
 import com.musiccollector.entity.ReleaseEntity;
+import com.musiccollector.model.core.AlbumDto;
+import com.musiccollector.model.core.ArtistDto;
 import com.musiccollector.model.core.CoverThemeDto;
 import com.musiccollector.model.core.Format;
 import com.musiccollector.model.core.ReleaseDto;
@@ -58,6 +60,20 @@ public final class MetadataMapper {
         return Format.fromMusicBrainz(release.media().getFirst().format());
     }
 
+    /** Discs across every medium — a 2xLP is one release with two of them. */
+    public static Integer discCount(MusicBrainzResponses.Release release) {
+        if (release.media() == null || release.media().isEmpty()) {
+            return null;
+        }
+        int total = release.media().stream()
+                .map(MusicBrainzResponses.Medium::discCount)
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+        // A medium with no disc-count is still a disc; fall back to counting the media.
+        return total > 0 ? total : release.media().size();
+    }
+
     public static String label(MusicBrainzResponses.Release release) {
         return firstLabelInfo(release)
                 .map(MusicBrainzResponses.LabelInfo::label)
@@ -77,6 +93,42 @@ public final class MetadataMapper {
             return Optional.empty();
         }
         return infos.stream().filter(info -> info.label() != null || info.catalogNumber() != null).findFirst();
+    }
+
+    public static ArtistDto toArtistDto(MusicBrainzResponses.Artist artist) {
+        if (artist == null || artist.id() == null || artist.name() == null) {
+            return null;
+        }
+        MusicBrainzResponses.LifeSpan span = artist.lifeSpan();
+        return new ArtistDto(
+                UUID.fromString(artist.id()),
+                artist.name(),
+                // Blank rather than null when absent, so a client never renders "null".
+                artist.disambiguation() == null ? "" : artist.disambiguation(),
+                artist.type(),
+                artist.country(),
+                span == null ? null : span.begin(),
+                span == null ? null : span.end(),
+                artist.score());
+    }
+
+    public static AlbumDto toAlbumDto(MusicBrainzResponses.ReleaseGroup group, String coverArtUrl) {
+        if (group == null || group.id() == null) {
+            return null;
+        }
+        String artist = group.artistCredit() == null || group.artistCredit().isEmpty()
+                ? "Unknown artist"
+                : group.artistCredit().stream()
+                        .map(MusicBrainzResponses.ArtistCredit::name)
+                        .filter(name -> name != null && !name.isBlank())
+                        .collect(Collectors.joining(", "));
+        return new AlbumDto(
+                UUID.fromString(group.id()),
+                group.title() == null ? "Untitled" : group.title(),
+                artist,
+                year(group.firstReleaseDate()),
+                group.primaryType(),
+                coverArtUrl);
     }
 
     public static ReleaseDto toDto(ReleaseEntity entity, UUID releaseGroupMbid) {
@@ -99,6 +151,9 @@ public final class MetadataMapper {
                 entity.getCatalogNumber(),
                 entity.getCountry(),
                 entity.getBarcode(),
+                entity.getReleaseDate(),
+                entity.getTrackCount(),
+                entity.getDiscCount(),
                 coverArtUrl(entity),
                 theme);
     }

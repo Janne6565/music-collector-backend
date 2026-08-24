@@ -1,6 +1,8 @@
 package com.musiccollector.controller.v1.implementation;
 
 import com.musiccollector.controller.v1.schema.MetadataApi;
+import com.musiccollector.model.core.ArtistDto;
+import com.musiccollector.model.core.DiscographyDto;
 import com.musiccollector.model.core.ReleaseDto;
 import com.musiccollector.services.metadata.MetadataService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,22 @@ public class MetadataController implements MetadataApi {
     @Override
     public ResponseEntity<List<ReleaseDto>> findByBarcode(String barcode) {
         return ResponseEntity.ok(metadataService.findByBarcode(barcode));
+    }
+
+    @Override
+    public ResponseEntity<List<ArtistDto>> searchArtists(String query, int limit) {
+        return ResponseEntity.ok(metadataService.searchArtists(query.trim(), limit));
+    }
+
+    @Override
+    public ResponseEntity<DiscographyDto> albumsOfArtist(UUID mbid, String primaryType, int limit) {
+        MetadataService.Discography discography = metadataService.albumsOfArtist(mbid, primaryType, limit);
+        return ResponseEntity.ok(new DiscographyDto(discography.albums(), discography.total()));
+    }
+
+    @Override
+    public ResponseEntity<List<ReleaseDto>> releasesInGroup(UUID mbid, int limit) {
+        return ResponseEntity.ok(metadataService.releasesInGroup(mbid, limit));
     }
 
     @Override
