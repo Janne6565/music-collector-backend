@@ -23,7 +23,13 @@ public final class MusicBrainzResponses {
             @JsonProperty("artist-credit") List<ArtistCredit> artistCredit,
             @JsonProperty("release-group") ReleaseGroup releaseGroup,
             @JsonProperty("label-info") List<LabelInfo> labelInfo,
-            List<Medium> media) {}
+            List<Medium> media,
+            /** Present on a lookup, absent from search results — so null means "unknown". */
+            @JsonProperty("cover-art-archive") CoverArtArchive coverArtArchive) {}
+
+    /** What the Cover Art Archive holds for a release, as MusicBrainz reports it. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record CoverArtArchive(Boolean front, Boolean artwork, Integer count) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ArtistCredit(String name, Artist artist) {}

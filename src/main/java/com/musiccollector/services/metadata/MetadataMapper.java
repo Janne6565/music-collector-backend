@@ -99,7 +99,19 @@ public final class MetadataMapper {
                 entity.getCatalogNumber(),
                 entity.getCountry(),
                 entity.getBarcode(),
-                entity.getCoverArtUrl(),
+                coverArtUrl(entity),
                 theme);
+    }
+
+    /**
+     * The cover URL, or null once we know there is nothing behind it.
+     *
+     * The URL is built from the mbid and exists whether or not the archive holds any bytes,
+     * so handing it over unconditionally made every client discover the 404 by failing to
+     * render an image. Null is reserved for a definite no; while the answer is still
+     * unknown the URL is returned and the client falls back if it does not load.
+     */
+    private static String coverArtUrl(ReleaseEntity entity) {
+        return Boolean.FALSE.equals(entity.getHasCoverArt()) ? null : entity.getCoverArtUrl();
     }
 }
