@@ -1,5 +1,7 @@
 package com.musiccollector.controller.v1.schema;
 
+import com.musiccollector.model.core.ArtistDto;
+import com.musiccollector.model.core.DiscographyDto;
 import com.musiccollector.model.core.ReleaseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -46,6 +48,42 @@ public interface MetadataApi {
     @ApiResponse(responseCode = "429", description = "Per-IP rate limit exceeded")
     ResponseEntity<List<ReleaseDto>> findByBarcode(
             @PathVariable @Pattern(regexp = "\\d{8,14}", message = "A barcode is 8 to 14 digits") String barcode);
+
+    @GetMapping("/artists")
+    @Operation(
+            summary = "Search artists by name",
+            description = "Separate from /search on purpose. The release index matches on title, so a bare "
+                    + "band name there returns records *called* that name and nothing by the band. Results "
+                    + "carry MusicBrainz's own match score, highest first.")
+    @ApiResponse(responseCode = "200", description = "Matching artists, possibly empty")
+    @ApiResponse(responseCode = "429", description = "Per-IP rate limit exceeded")
+    @ApiResponse(responseCode = "502", description = "MusicBrainz is unreachable")
+    ResponseEntity<List<ArtistDto>> searchArtists(
+            @RequestParam("q") @NotBlank @Size(max = 200) String query,
+            @RequestParam(value = "limit", defaultValue = "5") @Min(1) @Max(25) int limit);
+
+    @GetMapping("/artists/{mbid}/albums")
+    @Operation(
+            summary = "One artist's discography, by primary type",
+            description = "`total` is how many the query matched upstream, not the size of this page — a "
+                    + "client showing \"Albums 51\" is telling the truth on a page of 25. Omit `type` for "
+                    + "everything.")
+    @ApiResponse(responseCode = "200", description = "A page of the discography")
+    @ApiResponse(responseCode = "502", description = "MusicBrainz is unreachable")
+    ResponseEntity<DiscographyDto> albumsOfArtist(
+            @PathVariable UUID mbid,
+            @RequestParam(value = "type", required = false) @Size(max = 30) String primaryType,
+            @RequestParam(value = "limit", defaultValue = "25") @Min(1) @Max(100) int limit);
+
+    @GetMapping("/release-groups/{mbid}/releases")
+    @Operation(
+            summary = "Every pressing of one album",
+            description = "Bitches Brew has 47, so this pages rather than pretending the list is short.")
+    @ApiResponse(responseCode = "200", description = "The pressings, possibly empty")
+    @ApiResponse(responseCode = "502", description = "MusicBrainz is unreachable")
+    ResponseEntity<List<ReleaseDto>> releasesInGroup(
+            @PathVariable UUID mbid,
+            @RequestParam(value = "limit", defaultValue = "25") @Min(1) @Max(100) int limit);
 
     @GetMapping("/releases/{mbid}")
     @Operation(summary = "Full detail for one release, including its cover theme",

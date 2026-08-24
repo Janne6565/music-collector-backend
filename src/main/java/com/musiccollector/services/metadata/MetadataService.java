@@ -6,6 +6,8 @@ import com.musiccollector.client.MusicBrainzResponses;
 import com.musiccollector.configuration.CacheConfig;
 import com.musiccollector.entity.ReleaseEntity;
 import com.musiccollector.entity.ReleaseGroupEntity;
+import com.musiccollector.model.core.AlbumDto;
+import com.musiccollector.model.core.ArtistDto;
 import com.musiccollector.model.core.ReleaseDto;
 import com.musiccollector.model.exception.ReleaseNotFoundException;
 import com.musiccollector.repository.ReleaseGroupRepository;
@@ -72,6 +74,63 @@ public class MetadataService {
     }
 
     /**
+     * Artists matching a name, most confident first.
+     *
+     * Kept separate from {@link #search} rather than merged into it: they are two upstream
+     * requests a second apart, and a client that renders artists the moment they land reads
+     * as faster than one that waits to show both at once.
+     */
+    @Transactional(readOnly = true)
+    public List<ArtistDto> searchArtists(String query, int limit) {
+        return musicBrainzClient.searchArtists(query, limit).stream()
+                .map(MetadataMapper::toArtistDto)
+                .filter(java.util.Objects::nonNull)
+                .sorted(java.util.Comparator.comparing(
+                        ArtistDto::score, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                .toList();
+    }
+
+    /**
+     * One artist's discography, narrowed to a primary type.
+     *
+     * The total is the count MusicBrainz reports for the query, not the size of the page —
+     * a client showing "Albums 51" is telling the truth even though it only received 25.
+     */
+    @Transactional(readOnly = true)
+    public Discography albumsOfArtist(UUID artistMbid, String primaryType, int limit) {
+        String query = primaryType == null || primaryType.isBlank()
+                ? "arid:" + artistMbid
+                // Quoted so a two-word type cannot be split into two terms by Lucene.
+                : "arid:" + artistMbid + " AND primarytype:\"" + primaryType + "\"";
+        MusicBrainzResponses.ReleaseGroupSearchResponse response =
+                musicBrainzClient.searchReleaseGroups(query, limit);
+        List<AlbumDto> albums = (response.releaseGroups() == null ? List.<MusicBrainzResponses.ReleaseGroup>of()
+                        : response.releaseGroups())
+                .stream()
+                .map(group -> MetadataMapper.toAlbumDto(group, coverArtClient.frontCoverUrlForGroup(group.id())))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        return new Discography(albums, response.count());
+    }
+
+    /** A page of a discography plus how many the query matched in total. */
+    public record Discography(List<AlbumDto> albums, int total) {}
+
+    /**
+     * Every pressing of one album, newest metadata first.
+     *
+     * Persisted on the way through like any other release, so adding one of them straight
+     * from the pressing table works offline afterwards.
+     */
+    @Transactional
+    public List<ReleaseDto> releasesInGroup(UUID releaseGroupMbid, int limit) {
+        return musicBrainzClient.findReleasesInGroup(releaseGroupMbid.toString(), limit).stream()
+                .map(this::upsert)
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
+    /**
      * Full detail for one release, including its cover theme. The palette is sampled and
      * persisted on the first lookup and reused by every caller afterwards.
      */
@@ -120,6 +179,9 @@ public class MetadataService {
         entity.setCatalogNumber(MetadataMapper.catalogNumber(release));
         entity.setCountry(release.country());
         entity.setBarcode(release.barcode());
+        entity.setReleaseDate(release.date());
+        entity.setTrackCount(release.trackCount());
+        entity.setDiscCount(MetadataMapper.discCount(release));
         entity.setCoverArtUrl(coverArtClient.frontCoverUrl(release.id()));
         // A lookup tells us whether there is a front cover; a search does not mention it at
         // all. Null is therefore "not asked yet", not "no cover" — see toDto.

@@ -14,6 +14,13 @@ public final class MusicBrainzResponses {
     public record SearchResponse(int count, List<Release> releases) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ArtistSearchResponse(int count, List<Artist> artists) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ReleaseGroupSearchResponse(
+            int count, @JsonProperty("release-groups") List<ReleaseGroup> releaseGroups) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record Release(
             String id,
             String title,
@@ -24,6 +31,8 @@ public final class MusicBrainzResponses {
             @JsonProperty("release-group") ReleaseGroup releaseGroup,
             @JsonProperty("label-info") List<LabelInfo> labelInfo,
             List<Medium> media,
+            /** Tracks across every medium, which is what the pressing table shows. */
+            @JsonProperty("track-count") Integer trackCount,
             /** Present on a lookup, absent from search results — so null means "unknown". */
             @JsonProperty("cover-art-archive") CoverArtArchive coverArtArchive) {}
 
@@ -35,11 +44,27 @@ public final class MusicBrainzResponses {
     public record ArtistCredit(String name, Artist artist) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Artist(String id, String name) {}
+    public record Artist(
+            String id,
+            String name,
+            String disambiguation,
+            /** "Group" or "Person" — the deck shows it beside the country. */
+            String type,
+            String country,
+            Integer score,
+            @JsonProperty("life-span") LifeSpan lifeSpan) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record LifeSpan(String begin, String end, Boolean ended) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ReleaseGroup(
-            String id, String title, @JsonProperty("first-release-date") String firstReleaseDate) {}
+            String id,
+            String title,
+            @JsonProperty("first-release-date") String firstReleaseDate,
+            /** Album, EP, Single, Broadcast, Other — how the artist screen sections itself. */
+            @JsonProperty("primary-type") String primaryType,
+            @JsonProperty("artist-credit") List<ArtistCredit> artistCredit) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record LabelInfo(@JsonProperty("catalog-number") String catalogNumber, Label label) {}
@@ -48,5 +73,8 @@ public final class MusicBrainzResponses {
     public record Label(String name) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Medium(String format) {}
+    public record Medium(
+            String format,
+            @JsonProperty("disc-count") Integer discCount,
+            @JsonProperty("track-count") Integer trackCount) {}
 }

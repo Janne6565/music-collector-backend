@@ -64,6 +64,16 @@ public class ReleaseEntity {
     @Column(name = "has_cover_art")
     private Boolean hasCoverArt;
 
+    /** The full date as MusicBrainz holds it, which may be partial: "1970" or "1970-03-30". */
+    @Column(name = "release_date")
+    private String releaseDate;
+
+    @Column(name = "track_count")
+    private Integer trackCount;
+
+    @Column(name = "disc_count")
+    private Integer discCount;
+
     @Column(name = "dominant_color")
     private String dominantColor;
 
