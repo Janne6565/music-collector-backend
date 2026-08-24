@@ -1,11 +1,14 @@
 package com.musiccollector.services.sync;
 
 import com.musiccollector.entity.CopyEntity;
+import com.musiccollector.entity.PhotoEntity;
 import com.musiccollector.entity.WishlistItemEntity;
 import com.musiccollector.model.core.SyncCopyDto;
+import com.musiccollector.model.core.SyncPhotoDto;
 import com.musiccollector.model.core.SyncPullDto;
 import com.musiccollector.model.core.SyncWishDto;
 import com.musiccollector.repository.CopyRepository;
+import com.musiccollector.repository.PhotoRepository;
 import com.musiccollector.repository.WishlistItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -42,64 +45,141 @@ public class SyncService {
 
     private final CopyRepository copyRepository;
     private final WishlistItemRepository wishlistItemRepository;
+    private final PhotoRepository photoRepository;
+    private final com.musiccollector.services.storage.StorageService storageService;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public SyncPullDto pull(UUID userId, long since) {
-        List<CopyEntity> changedCopies =
+        List<CopyEntity> copies =
                 copyRepository.findAllByUserIdAndSyncSeqGreaterThanOrderBySyncSeqAsc(userId, since);
-        List<WishlistItemEntity> changedWishes =
+        List<WishlistItemEntity> wishes =
                 wishlistItemRepository.findAllByUserIdAndSyncSeqGreaterThanOrderBySyncSeqAsc(userId, since);
+        List<PhotoEntity> photos =
+                photoRepository.findAllByUserIdAndSyncSeqGreaterThanOrderBySyncSeqAsc(userId, since);
 
-        boolean copiesTruncated = changedCopies.size() > PULL_PAGE_SIZE;
-        boolean wishesTruncated = changedWishes.size() > PULL_PAGE_SIZE;
-        List<CopyEntity> copyPage = copiesTruncated ? changedCopies.subList(0, PULL_PAGE_SIZE) : changedCopies;
-        List<WishlistItemEntity> wishPage =
-                wishesTruncated ? changedWishes.subList(0, PULL_PAGE_SIZE) : changedWishes;
+        Page<CopyEntity> copyPage = page(copies, CopyEntity::getSyncSeq);
+        Page<WishlistItemEntity> wishPage = page(wishes, WishlistItemEntity::getSyncSeq);
+        Page<PhotoEntity> photoPage = page(photos, PhotoEntity::getSyncSeq);
+        List<Page<?>> pages = List.of(copyPage, wishPage, photoPage);
 
+        boolean hasMore = pages.stream().anyMatch(Page::truncated);
         long cursor;
-        boolean hasMore;
-        if (copiesTruncated || wishesTruncated) {
-            // A page was cut short, so the cursor must stop at the lowest point both kinds
-            // are complete up to — otherwise it would advance past records never sent, and
-            // the client would never ask for them again.
-            long copyLimit = copiesTruncated ? copyPage.getLast().getSyncSeq() : Long.MAX_VALUE;
-            long wishLimit = wishesTruncated ? wishPage.getLast().getSyncSeq() : Long.MAX_VALUE;
-            cursor = Math.min(copyLimit, wishLimit);
-            hasMore = true;
+        if (hasMore) {
+            // A page was cut short, so the cursor must stop at the lowest point every kind
+            // is complete up to. Advancing past a record that was not sent would leave it
+            // stranded on the server with the client believing it is up to date.
+            cursor = pages.stream()
+                    .filter(Page::truncated)
+                    .mapToLong(Page::lastSeq)
+                    .min()
+                    .orElse(since);
         } else {
-            // Everything fits, so nothing is withheld and the cursor can take the high-water
-            // mark of both. Clamping it here would strand whichever kind sorted higher: the
-            // client would stop pulling with records still outstanding.
-            long highest = since;
-            if (!copyPage.isEmpty()) {
-                highest = Math.max(highest, copyPage.getLast().getSyncSeq());
-            }
-            if (!wishPage.isEmpty()) {
-                highest = Math.max(highest, wishPage.getLast().getSyncSeq());
-            }
-            cursor = highest;
-            hasMore = false;
+            // Nothing was withheld, so the cursor can take the high-water mark of them all.
+            cursor = pages.stream().mapToLong(Page::lastSeq).filter(seq -> seq > 0).max().orElse(since);
+            cursor = Math.max(cursor, since);
         }
 
         final long limit = cursor;
         return new SyncPullDto(
-                copyPage.stream().filter(copy -> copy.getSyncSeq() <= limit).map(this::toDto).toList(),
-                wishPage.stream().filter(wish -> wish.getSyncSeq() <= limit).map(this::toWishDto).toList(),
+                copyPage.upTo(limit, CopyEntity::getSyncSeq).stream().map(this::toDto).toList(),
+                wishPage.upTo(limit, WishlistItemEntity::getSyncSeq).stream().map(this::toWishDto).toList(),
+                photoPage.upTo(limit, PhotoEntity::getSyncSeq).stream().map(this::toPhotoDto).toList(),
                 limit,
                 hasMore);
     }
 
-    /**
-     * Merges a batch of client records into the user's collection and returns the merged
-     * results, so the client can adopt whatever the server decided.
-     */
+    /** One kind's slice of a pull, with whether it had to be cut short. */
+    private record Page<T>(List<T> rows, boolean truncated, long lastSeq) {
+        List<T> upTo(long limit, java.util.function.ToLongFunction<T> seq) {
+            return rows.stream().filter(row -> seq.applyAsLong(row) <= limit).toList();
+        }
+    }
+
+    private <T> Page<T> page(List<T> all, java.util.function.ToLongFunction<T> seq) {
+        boolean truncated = all.size() > PULL_PAGE_SIZE;
+        List<T> rows = truncated ? all.subList(0, PULL_PAGE_SIZE) : all;
+        long lastSeq = rows.isEmpty() ? 0 : seq.applyAsLong(rows.getLast());
+        return new Page<>(rows, truncated, lastSeq);
+    }
+
     @Transactional
-    public SyncPullDto push(UUID userId, List<SyncCopyDto> incoming, List<SyncWishDto> incomingWishes) {
+    public SyncPullDto push(
+            UUID userId,
+            List<SyncCopyDto> incoming,
+            List<SyncWishDto> incomingWishes,
+            List<SyncPhotoDto> incomingPhotos) {
         Pushed<SyncCopyDto> copies = pushCopies(userId, incoming);
         Pushed<SyncWishDto> wishes = pushWishes(userId, incomingWishes);
-        return new SyncPullDto(
-                copies.records(), wishes.records(), Math.max(copies.highWaterMark(), wishes.highWaterMark()), false);
+        Pushed<SyncPhotoDto> photos = pushPhotos(userId, incomingPhotos);
+        long cursor = Math.max(copies.highWaterMark(), Math.max(wishes.highWaterMark(), photos.highWaterMark()));
+        return new SyncPullDto(copies.records(), wishes.records(), photos.records(), cursor, false);
+    }
+
+    private Pushed<SyncPhotoDto> pushPhotos(UUID userId, List<SyncPhotoDto> incoming) {
+        if (incoming.isEmpty()) {
+            return new Pushed<>(List.of(), 0);
+        }
+
+        List<UUID> ids = incoming.stream().map(photo -> UUID.fromString(photo.id())).toList();
+        Map<UUID, PhotoEntity> stored = new HashMap<>();
+        for (PhotoEntity entity : photoRepository.findAllByUserIdAndIdIn(userId, ids)) {
+            stored.put(entity.getId(), entity);
+        }
+
+        List<SyncPhotoDto> results = new ArrayList<>(incoming.size());
+        long highWaterMark = 0;
+        for (SyncPhotoDto client : incoming) {
+            UUID id = UUID.fromString(client.id());
+            PhotoEntity entity = stored.get(id);
+            SyncPhotoDto merged = PhotoMerge.merge(entity == null ? null : toPhotoDto(entity), client);
+
+            PhotoEntity target = entity;
+            if (target == null) {
+                target = new PhotoEntity();
+                target.setId(id);
+                target.setUserId(userId);
+            }
+            applyPhoto(target, merged);
+            target.setSyncSeq(copyRepository.nextSyncSeq());
+            photoRepository.save(target);
+
+            // A deleted photo's bytes are no longer anybody's: remove the object rather
+            // than paying to store a picture no client will ever ask for again.
+            if (merged.deletedAt() != null && merged.storageKey() != null) {
+                storageService.delete(merged.storageKey());
+            }
+
+            highWaterMark = Math.max(highWaterMark, target.getSyncSeq());
+            results.add(merged);
+        }
+
+        log.debug("Merged {} photos for user {}", results.size(), userId);
+        return new Pushed<>(results, highWaterMark);
+    }
+
+    private void applyPhoto(PhotoEntity entity, SyncPhotoDto dto) {
+        entity.setCopyId(UUID.fromString(dto.copyId()));
+        entity.setStorageKey(dto.storageKey());
+        entity.setContentType(dto.contentType() == null ? "application/octet-stream" : dto.contentType());
+        entity.setByteSize(dto.byteSize() == null ? 0L : dto.byteSize());
+        entity.setSortIndex(dto.sortIndex() == null ? 0 : dto.sortIndex());
+        entity.setCreatedAt(dto.createdAt());
+        entity.setDeletedAt(dto.deletedAt());
+        entity.setFieldClocks(writeClocks(dto.fieldClocks()));
+    }
+
+    private SyncPhotoDto toPhotoDto(PhotoEntity entity) {
+        return new SyncPhotoDto(
+                entity.getId().toString(),
+                entity.getCopyId().toString(),
+                entity.getStorageKey(),
+                entity.getContentType(),
+                entity.getByteSize(),
+                entity.getSortIndex(),
+                entity.getCreatedAt(),
+                entity.getDeletedAt(),
+                readClocks(entity.getFieldClocks()));
     }
 
     /**

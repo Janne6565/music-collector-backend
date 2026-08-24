@@ -1,6 +1,12 @@
 spring:
   application:
     name: music-collector-backend
+  servlet:
+    multipart:
+      # Slightly above the app's own limit, so an oversized upload is rejected by the
+      # service with a clear message rather than by the container with a generic one.
+      max-file-size: 16MB
+      max-request-size: 16MB
   datasource:
     url: ${MC_DB_URL:jdbc:postgresql://localhost:5432/musiccollector}
     username: ${MC_DB_USER:musiccollector}
@@ -30,6 +36,14 @@ music-collector:
     # Off only for local HTTP development.
     cookie-secure: ${MC_COOKIE_SECURE:true}
     attempts-per-hour: 20
+  storage:
+    endpoint: ${MC_MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MC_MINIO_ACCESS_KEY:musiccollector}
+    secret-key: ${MC_MINIO_SECRET_KEY:musiccollector-secret}
+    bucket: ${MC_MINIO_BUCKET:music-collector-photos}
+    # A phone photo is a couple of megabytes; 15 leaves room for a large one without
+    # letting the endpoint be used as free object storage.
+    max-upload-bytes: 15728640
   musicbrainz:
     base-url: https://musicbrainz.org/ws/2
     cover-art-base-url: https://coverartarchive.org

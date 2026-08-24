@@ -1,10 +1,13 @@
 package com.musiccollector.services.sync;
 
 import com.musiccollector.entity.CopyEntity;
+import com.musiccollector.entity.PhotoEntity;
 import com.musiccollector.entity.WishlistItemEntity;
 import com.musiccollector.model.core.SyncPullDto;
 import com.musiccollector.repository.CopyRepository;
+import com.musiccollector.repository.PhotoRepository;
 import com.musiccollector.repository.WishlistItemRepository;
+import com.musiccollector.services.storage.StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,12 +35,15 @@ class SyncServiceCursorTest {
 
     @Mock private CopyRepository copyRepository;
     @Mock private WishlistItemRepository wishlistItemRepository;
+    @Mock private PhotoRepository photoRepository;
+    @Mock private StorageService storageService;
 
     private SyncService service;
 
     @BeforeEach
     void setUp() {
-        service = new SyncService(copyRepository, wishlistItemRepository, new ObjectMapper());
+        service = new SyncService(
+                copyRepository, wishlistItemRepository, photoRepository, storageService, new ObjectMapper());
     }
 
     private CopyEntity copy(long seq) {
@@ -65,11 +71,32 @@ class SyncServiceCursorTest {
         return entity;
     }
 
+    private PhotoEntity photo(long seq) {
+        PhotoEntity entity = new PhotoEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setUserId(USER);
+        entity.setCopyId(UUID.randomUUID());
+        entity.setStorageKey("k");
+        entity.setContentType("image/jpeg");
+        entity.setByteSize(1L);
+        entity.setSortIndex(0);
+        entity.setCreatedAt(1L);
+        entity.setFieldClocks("{}");
+        entity.setSyncSeq(seq);
+        return entity;
+    }
+
     private void given(List<CopyEntity> copies, List<WishlistItemEntity> wishes) {
+        given(copies, wishes, List.of());
+    }
+
+    private void given(List<CopyEntity> copies, List<WishlistItemEntity> wishes, List<PhotoEntity> photos) {
         when(copyRepository.findAllByUserIdAndSyncSeqGreaterThanOrderBySyncSeqAsc(any(), anyLong()))
                 .thenReturn(copies);
         when(wishlistItemRepository.findAllByUserIdAndSyncSeqGreaterThanOrderBySyncSeqAsc(any(), anyLong()))
                 .thenReturn(wishes);
+        when(photoRepository.findAllByUserIdAndSyncSeqGreaterThanOrderBySyncSeqAsc(any(), anyLong()))
+                .thenReturn(photos);
     }
 
     @Test
@@ -110,12 +137,25 @@ class SyncServiceCursorTest {
     }
 
     @Test
+    void sendsAllThreeKindsTogether() {
+        given(List.of(copy(3)), List.of(wish(11)), List.of(photo(7)));
+
+        SyncPullDto page = service.pull(USER, 0);
+
+        assertThat(page.copies()).hasSize(1);
+        assertThat(page.wishes()).hasSize(1);
+        assertThat(page.photos()).hasSize(1);
+        assertThat(page.cursor()).isEqualTo(11);
+        assertThat(page.hasMore()).isFalse();
+    }
+
+    @Test
     void holdsTheCursorBackAndAsksForAnotherPageWhenOneKindIsTruncated() {
         List<CopyEntity> manyCopies = new java.util.ArrayList<>();
         for (long seq = 1; seq <= 600; seq++) {
             manyCopies.add(copy(seq));
         }
-        given(manyCopies, List.of(wish(900)));
+        given(manyCopies, List.of(wish(900)), List.of(photo(950)));
 
         SyncPullDto page = service.pull(USER, 0);
 
@@ -124,6 +164,7 @@ class SyncServiceCursorTest {
         assertThat(page.cursor()).isEqualTo(500);
         assertThat(page.copies()).hasSize(500);
         assertThat(page.wishes()).isEmpty();
+        assertThat(page.photos()).isEmpty();
         assertThat(page.hasMore()).isTrue();
     }
 }
