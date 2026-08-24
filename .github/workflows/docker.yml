@@ -1,0 +1,92 @@
+name: Build image and bump deployment
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+
+env:
+  IMAGE: ghcr.io/janne6565/music-collector-backend
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      sha_tag: ${{ steps.vars.outputs.sha_tag }}
+      version: ${{ steps.vars.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: vars
+        run: |
+          echo "sha_tag=main-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          # Branch push -> main-<sha> + staging-latest; semver tag -> X.Y.Z + prod-latest.
+          tags: |
+            type=raw,value=${{ steps.vars.outputs.sha_tag }},enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=staging-latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}}
+            type=raw,value=prod-latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  bump:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out music-collector-deployment
+        uses: actions/checkout@v4
+        with:
+          repository: Janne6565/music-collector-deployment
+          # Deploy key scoped to that one repo; checkout configures the SSH remote
+          # so the push below needs no extra auth.
+          ssh-key: ${{ secrets.DEPLOY_REPO_SSH_KEY }}
+
+      - uses: imranismail/setup-kustomize@v2
+
+      - name: Pin the new image
+        run: |
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            overlay=staging
+            tag="${{ needs.build.outputs.sha_tag }}"
+          else
+            overlay=prod
+            tag="${{ needs.build.outputs.version }}"
+          fi
+          cd "overlays/${overlay}"
+          kustomize edit set image "${IMAGE}:${tag}"
+          cd -
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "already at ${tag}"; exit 0; }
+          git commit -m "ci: update backend image to ${tag}"
+          # Another product repo may have pushed between our checkout and here.
+          for attempt in 1 2 3; do
+            git push && exit 0
+            git pull --rebase
+          done
+          exit 1
