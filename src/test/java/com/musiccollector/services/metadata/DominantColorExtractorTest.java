@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.data.Offset.offset;
 
 class DominantColorExtractorTest {
 
@@ -37,7 +38,7 @@ class DominantColorExtractorTest {
 
         assertThat(palette).hasValueSatisfying(p -> {
             assertThat(p.dominantColor()).isEqualTo("#2e2b24");
-            assertThat(p.luminance()).isLessThan(CoverPalette.DARK_CHROME_THRESHOLD);
+            assertThat(p.lightness()).isLessThan(CoverPalette.DARK_CHROME_THRESHOLD);
             assertThat(p.dark()).isTrue();
         });
     }
@@ -86,8 +87,29 @@ class DominantColorExtractorTest {
     }
 
     @Test
-    void whiteAndBlackSitAtTheEndsOfTheLuminanceScale() {
-        assertThat(DominantColorExtractor.relativeLuminance(255, 255, 255)).isEqualTo(1.0, org.assertj.core.data.Offset.offset(1e-9));
-        assertThat(DominantColorExtractor.relativeLuminance(0, 0, 0)).isEqualTo(0.0, org.assertj.core.data.Offset.offset(1e-9));
+    void whiteAndBlackSitAtTheEndsOfTheScale() {
+        assertThat(DominantColorExtractor.perceptualLightness(255, 255, 255)).isEqualTo(1.0, offset(1e-6));
+        assertThat(DominantColorExtractor.perceptualLightness(0, 0, 0)).isEqualTo(0.0, offset(1e-6));
+    }
+
+    @Test
+    void midGreyLandsNearTheMiddleOfTheScale() {
+        // The reason this is CIE L* and not WCAG relative luminance. On the luminance
+        // scale mid-grey sits at 0.22, so a "below 55%" rule would call it dark — and with
+        // it, almost every sleeve.
+        assertThat(DominantColorExtractor.relativeLuminance(0x80, 0x80, 0x80)).isCloseTo(0.216, offset(0.01));
+        assertThat(DominantColorExtractor.perceptualLightness(0x80, 0x80, 0x80)).isCloseTo(0.534, offset(0.01));
+    }
+
+    @Test
+    void aPaleGreySleeveIsNotCalledDark() throws IOException {
+        // Regression: the aged off-white of a scanned White Album sleeve. Under the old
+        // luminance rule this measured 0.459 and was themed dark, which is plainly wrong.
+        Optional<CoverPalette> palette = extractor.extract(png(solid(new Color(0xb4, 0xb6, 0xa5))));
+
+        assertThat(palette).hasValueSatisfying(p -> {
+            assertThat(p.lightness()).isGreaterThan(CoverPalette.DARK_CHROME_THRESHOLD);
+            assertThat(p.dark()).isFalse();
+        });
     }
 }

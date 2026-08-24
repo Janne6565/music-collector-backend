@@ -5,6 +5,7 @@ import com.musiccollector.model.exception.UpstreamUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -74,6 +75,10 @@ public class MusicBrainzClient {
                             .build(mbid))
                     .retrieve()
                     .body(MusicBrainzResponses.Release.class));
+        } catch (HttpClientErrorException.NotFound e) {
+            // MusicBrainz genuinely has no such release. That is a 404 for our caller, not
+            // an upstream failure — reporting it as 502 would tell the client to retry.
+            return Optional.empty();
         } catch (RestClientException e) {
             throw new UpstreamUnavailableException("MusicBrainz", e);
         }

@@ -146,10 +146,10 @@ public class MetadataService {
                 .ifPresent(palette -> {
                     entity.setDominantColor(palette.dominantColor());
                     entity.setAccentColor(palette.accentColor());
-                    entity.setLuminance(palette.luminance());
+                    entity.setLightness(palette.lightness());
                     releaseRepository.save(entity);
-                    log.debug("Sampled cover for {}: {} (luminance {})",
-                            entity.getMbid(), palette.dominantColor(), palette.luminance());
+                    log.debug("Sampled cover for {}: {} (lightness {})",
+                            entity.getMbid(), palette.dominantColor(), palette.lightness());
                 });
     }
 

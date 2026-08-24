@@ -31,11 +31,12 @@ CREATE TABLE releases (
     country           TEXT,
     barcode           TEXT,
     cover_art_url     TEXT,
-    -- Sampled from the cover once, at import. `luminance` is WCAG relative luminance;
-    -- the clients compare it against their dark-chrome threshold.
+    -- Sampled from the cover once, at import. `lightness` is perceptual CIE L* normalised
+    -- to 0..1 -- not WCAG relative luminance, which is linear light and would put mid-grey
+    -- at 0.22, making a "below 55%" rule call almost every sleeve dark.
     dominant_color    TEXT,
     accent_color      TEXT,
-    luminance         DOUBLE PRECISION,
+    lightness         DOUBLE PRECISION,
     fetched_at        TIMESTAMPTZ NOT NULL
 );
 

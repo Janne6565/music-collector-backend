@@ -9,4 +9,4 @@ package com.musiccollector.model.core;
  * themed detail screen straight from the metadata proxy, and the theme is right on first
  * paint rather than flashing after the image loads.
  */
-public record CoverThemeDto(String dominantColor, String accentColor, double luminance, boolean dark) {}
+public record CoverThemeDto(String dominantColor, String accentColor, double lightness, boolean dark) {}

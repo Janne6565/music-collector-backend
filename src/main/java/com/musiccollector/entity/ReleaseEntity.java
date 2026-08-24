@@ -63,7 +63,8 @@ public class ReleaseEntity {
     @Column(name = "accent_color")
     private String accentColor;
 
-    private Double luminance;
+    @Column(name = "lightness")
+    private Double lightness;
 
     @Column(name = "fetched_at", nullable = false)
     private Instant fetchedAt;

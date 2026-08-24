@@ -80,13 +80,13 @@ public final class MetadataMapper {
     }
 
     public static ReleaseDto toDto(ReleaseEntity entity, UUID releaseGroupMbid) {
-        CoverThemeDto theme = entity.getDominantColor() == null || entity.getLuminance() == null
+        CoverThemeDto theme = entity.getDominantColor() == null || entity.getLightness() == null
                 ? null
                 : new CoverThemeDto(
                         entity.getDominantColor(),
                         entity.getAccentColor(),
-                        entity.getLuminance(),
-                        entity.getLuminance() < CoverPalette.DARK_CHROME_THRESHOLD);
+                        entity.getLightness(),
+                        entity.getLightness() < CoverPalette.DARK_CHROME_THRESHOLD);
         return new ReleaseDto(
                 entity.getId(),
                 entity.getMbid(),
