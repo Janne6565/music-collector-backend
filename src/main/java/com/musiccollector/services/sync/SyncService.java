@@ -51,19 +51,35 @@ public class SyncService {
         List<WishlistItemEntity> changedWishes =
                 wishlistItemRepository.findAllByUserIdAndSyncSeqGreaterThanOrderBySyncSeqAsc(userId, since);
 
-        boolean hasMore = changedCopies.size() > PULL_PAGE_SIZE || changedWishes.size() > PULL_PAGE_SIZE;
-        List<CopyEntity> copyPage =
-                changedCopies.size() > PULL_PAGE_SIZE ? changedCopies.subList(0, PULL_PAGE_SIZE) : changedCopies;
+        boolean copiesTruncated = changedCopies.size() > PULL_PAGE_SIZE;
+        boolean wishesTruncated = changedWishes.size() > PULL_PAGE_SIZE;
+        List<CopyEntity> copyPage = copiesTruncated ? changedCopies.subList(0, PULL_PAGE_SIZE) : changedCopies;
         List<WishlistItemEntity> wishPage =
-                changedWishes.size() > PULL_PAGE_SIZE ? changedWishes.subList(0, PULL_PAGE_SIZE) : changedWishes;
+                wishesTruncated ? changedWishes.subList(0, PULL_PAGE_SIZE) : changedWishes;
 
-        // The cursor is the lowest of the two high-water marks, so a page that truncated one
-        // kind cannot advance past records of the other kind that were never sent.
-        long cursor = since;
-        if (!copyPage.isEmpty() || !wishPage.isEmpty()) {
-            long copyMax = copyPage.isEmpty() ? Long.MAX_VALUE : copyPage.getLast().getSyncSeq();
-            long wishMax = wishPage.isEmpty() ? Long.MAX_VALUE : wishPage.getLast().getSyncSeq();
-            cursor = Math.min(copyMax, wishMax);
+        long cursor;
+        boolean hasMore;
+        if (copiesTruncated || wishesTruncated) {
+            // A page was cut short, so the cursor must stop at the lowest point both kinds
+            // are complete up to — otherwise it would advance past records never sent, and
+            // the client would never ask for them again.
+            long copyLimit = copiesTruncated ? copyPage.getLast().getSyncSeq() : Long.MAX_VALUE;
+            long wishLimit = wishesTruncated ? wishPage.getLast().getSyncSeq() : Long.MAX_VALUE;
+            cursor = Math.min(copyLimit, wishLimit);
+            hasMore = true;
+        } else {
+            // Everything fits, so nothing is withheld and the cursor can take the high-water
+            // mark of both. Clamping it here would strand whichever kind sorted higher: the
+            // client would stop pulling with records still outstanding.
+            long highest = since;
+            if (!copyPage.isEmpty()) {
+                highest = Math.max(highest, copyPage.getLast().getSyncSeq());
+            }
+            if (!wishPage.isEmpty()) {
+                highest = Math.max(highest, wishPage.getLast().getSyncSeq());
+            }
+            cursor = highest;
+            hasMore = false;
         }
 
         final long limit = cursor;
