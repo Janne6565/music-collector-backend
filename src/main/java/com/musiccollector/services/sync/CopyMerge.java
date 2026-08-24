@@ -31,6 +31,7 @@ public final class CopyMerge {
     public static final List<String> MERGEABLE_FIELDS = List.of(
             "releaseMbid",
             "condition",
+            "sleeveCondition",
             "pricePaidCents",
             "currency",
             "purchasedOn",
@@ -74,6 +75,7 @@ public final class CopyMerge {
                 local.id(),
                 (String) values.get("releaseMbid"),
                 (String) values.get("condition"),
+                (String) values.get("sleeveCondition"),
                 (Integer) values.get("pricePaidCents"),
                 (String) values.get("currency"),
                 (String) values.get("purchasedOn"),
@@ -139,6 +141,7 @@ public final class CopyMerge {
         return switch (field) {
             case "releaseMbid" -> copy.releaseMbid();
             case "condition" -> copy.condition();
+            case "sleeveCondition" -> copy.sleeveCondition();
             case "pricePaidCents" -> copy.pricePaidCents();
             case "currency" -> copy.currency();
             case "purchasedOn" -> copy.purchasedOn();

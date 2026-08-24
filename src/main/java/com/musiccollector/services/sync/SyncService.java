@@ -297,6 +297,7 @@ public class SyncService {
     private void apply(CopyEntity entity, SyncCopyDto dto) {
         entity.setReleaseMbid(dto.releaseMbid());
         entity.setCondition(dto.condition());
+        entity.setSleeveCondition(dto.sleeveCondition());
         entity.setPricePaidCents(dto.pricePaidCents());
         entity.setCurrency(dto.currency() == null ? "EUR" : dto.currency());
         entity.setPurchasedOn(dto.purchasedOn());
@@ -314,6 +315,7 @@ public class SyncService {
                 entity.getId().toString(),
                 entity.getReleaseMbid(),
                 entity.getCondition(),
+                entity.getSleeveCondition(),
                 entity.getPricePaidCents(),
                 entity.getCurrency(),
                 entity.getPurchasedOn(),
