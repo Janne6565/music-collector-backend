@@ -44,12 +44,24 @@ public class OAuthController implements OAuthApi {
 
     @Override
     public ResponseEntity<Void> callback(String provider, String code, String state, String error) {
+        return complete(provider, code, state, error, null);
+    }
+
+    @Override
+    public ResponseEntity<Void> callbackPosted(
+            String provider, String code, String state, String error, String user) {
+        return complete(provider, code, state, error, user);
+    }
+
+    private ResponseEntity<Void> complete(
+            String provider, String code, String state, String error, String appleUserJson) {
         if (error != null || code == null) {
             return redirect("/signin?oauthError=true");
         }
         try {
             oauthService.consumeState(provider, state);
-            UserEntity user = userResolver.resolve(provider, oauthService.exchange(provider, code));
+            UserEntity user = userResolver.resolve(
+                    provider, oauthService.named(oauthService.exchange(provider, code), appleUserJson));
             AuthService.Session session = authService.issueFor(user);
 
             // The token goes in a cookie, never in the URL — a redirect target ends up in

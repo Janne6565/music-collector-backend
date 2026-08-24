@@ -23,6 +23,10 @@ public record OAuthProperties(String publicBaseUrl, Map<String, Provider> provid
      *                     static secret. See {@code AppleClientSecret}.
      * @param teamId       Apple only
      * @param keyId        Apple only
+     * @param responseMode how the provider returns the code. Blank means the ordinary
+     *                     redirect with query parameters. Apple requires {@code form_post}
+     *                     whenever name or e-mail scope is asked for, and answers with a
+     *                     cross-site form POST instead of a GET.
      */
     public record Provider(
             String displayName,
@@ -33,7 +37,12 @@ public record OAuthProperties(String publicBaseUrl, Map<String, Provider> provid
             String userInfoUrl,
             String scope,
             String teamId,
-            String keyId) {
+            String keyId,
+            String responseMode) {
+
+        public boolean postsBack() {
+            return "form_post".equalsIgnoreCase(responseMode);
+        }
 
         public boolean configured() {
             return clientId != null && !clientId.isBlank() && clientSecret != null && !clientSecret.isBlank();

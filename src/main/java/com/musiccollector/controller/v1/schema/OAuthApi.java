@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -48,4 +49,18 @@ public interface OAuthApi {
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String error);
+
+    @PostMapping("/oauth/{provider}/callback")
+    @Operation(
+            summary = "The same callback, for a provider that posts it back",
+            description = "Apple answers with a cross-site form POST rather than a redirect "
+                    + "whenever name or e-mail scope was requested, and sends the name in a "
+                    + "`user` field that appears on the first authorization only.")
+    @ApiResponse(responseCode = "302", description = "Redirect into the app")
+    ResponseEntity<Void> callbackPosted(
+            @PathVariable String provider,
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String error,
+            @RequestParam(required = false) String user);
 }

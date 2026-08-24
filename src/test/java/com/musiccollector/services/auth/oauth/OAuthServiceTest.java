@@ -27,18 +27,40 @@ class OAuthServiceTest {
         return new OAuthProperties.Provider(
                 "Google", "client-id", "client-secret",
                 "https://accounts.example/authorize", "https://accounts.example/token",
-                "https://accounts.example/userinfo", "openid email", null, null);
+                "https://accounts.example/userinfo", "openid email", null, null, null);
+    }
+
+    private static OAuthProperties.Provider applePostsBack() {
+        return new OAuthProperties.Provider(
+                "Apple", "services-id", "key", "https://appleid.example/authorize",
+                "https://appleid.example/token", null, "openid email name", "team", "kid", "form_post");
     }
 
     private static OAuthProperties.Provider unconfigured() {
         return new OAuthProperties.Provider(
                 "Apple", null, null, "https://appleid.example/authorize",
-                "https://appleid.example/token", null, "openid email", null, null);
+                "https://appleid.example/token", null, "openid email", null, null, null);
     }
 
     private OAuthService service(Map<String, OAuthProperties.Provider> providers) {
         return new OAuthService(
                 new OAuthProperties("https://music.example", providers), stateRepository);
+    }
+
+    @Test
+    void asksAppleToPostTheCallbackBack() {
+        // Apple rejects the request outright if name or e-mail scope is asked for without
+        // this, so its absence would break every Apple sign-in on the first attempt.
+        String url = service(Map.of("apple", applePostsBack())).authorizeUrl("apple");
+
+        assertThat(url).contains("response_mode=form_post");
+    }
+
+    @Test
+    void leavesResponseModeOffForProvidersThatRedirectNormally() {
+        String url = service(Map.of("google", configured())).authorizeUrl("google");
+
+        assertThat(url).doesNotContain("response_mode");
     }
 
     @Test

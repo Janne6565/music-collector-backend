@@ -67,6 +67,9 @@ music-collector:
         authorize-url: https://appleid.apple.com/auth/authorize
         token-url: https://appleid.apple.com/auth/token
         scope: openid email name
+        # Apple rejects a name/e-mail scope request that does not ask for form_post, and
+        # then answers by POSTing the callback instead of redirecting to it.
+        response-mode: form_post
   storage:
     endpoint: ${MC_MINIO_ENDPOINT:http://localhost:9000}
     access-key: ${MC_MINIO_ACCESS_KEY:musiccollector}

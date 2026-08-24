@@ -71,13 +71,20 @@ public class OAuthService {
         entity.setCreatedAt(Instant.now());
         stateRepository.save(entity);
 
-        return UriComponentsBuilder.fromUriString(provider.authorizeUrl())
+        UriComponentsBuilder url = UriComponentsBuilder.fromUriString(provider.authorizeUrl())
                 .queryParam("client_id", provider.clientId())
                 .queryParam("redirect_uri", redirectUri(providerId))
                 .queryParam("response_type", "code")
                 .queryParam("scope", provider.scope() == null ? "openid email profile" : provider.scope())
-                .queryParam("state", state)
-                .build()
+                .queryParam("state", state);
+
+        // Apple rejects a request for name or e-mail scope that does not ask for form_post,
+        // and then answers by POSTing the callback rather than redirecting to it.
+        if (provider.responseMode() != null && !provider.responseMode().isBlank()) {
+            url = url.queryParam("response_mode", provider.responseMode());
+        }
+
+        return url.build()
                 // Encoded, or the space in a multi-scope value ("openid email profile")
                 // makes an invalid URI and the redirect throws before it is ever sent.
                 .encode()
@@ -149,6 +156,20 @@ public class OAuthService {
                 String.valueOf(info.get("sub")),
                 info.get("email") == null ? null : String.valueOf(info.get("email")),
                 info.get("name") == null ? null : String.valueOf(info.get("name")));
+    }
+
+    /**
+     * Adds the name Apple sent in the callback form, if the id token had none.
+     *
+     * <p>The id token always wins: it came from the provider directly, while this value
+     * passed through the browser.
+     */
+    public ExternalIdentity named(ExternalIdentity identity, String appleUserJson) {
+        if (identity.displayName() != null && !identity.displayName().isBlank()) {
+            return identity;
+        }
+        String name = AppleUserPayload.displayName(appleUserJson);
+        return name == null ? identity : new ExternalIdentity(identity.subject(), identity.email(), name);
     }
 
     public String redirectUri(String providerId) {
