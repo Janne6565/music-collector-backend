@@ -16,6 +16,9 @@
 
 	<properties>
 		<java.version>25</java.version>
+		<!-- Overridden at image build time with the tag CI is publishing, so the running
+		     artifact can always name itself. A local `mvn package` stays "dev". -->
+		<mc.release>dev</mc.release>
 		<springdoc.version>3.0.3</springdoc.version>
 		<jjwt.version>0.12.6</jjwt.version>
 		<bucket4j.version>8.14.0</bucket4j.version>
@@ -150,6 +153,21 @@
 						</exclude>
 					</excludes>
 				</configuration>
+				<executions>
+					<execution>
+						<!-- Writes META-INF/build-info.properties into the jar, which Spring Boot
+						     exposes as a BuildProperties bean. Baking the version into the artifact
+						     means it cannot drift from the image the way a runtime env var can. -->
+						<goals>
+							<goal>build-info</goal>
+						</goals>
+						<configuration>
+							<additionalProperties>
+								<release>${mc.release}</release>
+							</additionalProperties>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

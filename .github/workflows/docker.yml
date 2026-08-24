@@ -22,8 +22,17 @@ jobs:
 
       - id: vars
         run: |
-          echo "sha_tag=main-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          sha_tag="main-$(git rev-parse --short HEAD)"
+          version="${GITHUB_REF_NAME#v}"
+          echo "sha_tag=$sha_tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Baked into the image so the running service can name itself. A tag build
+          # reports the semver; a main build reports the sha it was built from.
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            echo "release=$sha_tag" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=$version" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: docker/setup-buildx-action@v3
 
@@ -48,6 +57,8 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            MC_RELEASE=${{ steps.vars.outputs.release }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

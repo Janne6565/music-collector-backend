@@ -21,7 +21,6 @@ spring:
       enabled: true
 
 music-collector:
-  version: ${MC_VERSION:dev}
   jwt:
     # No fallback on purpose: the app must fail to start rather than run on a known secret.
     secret: ${MC_JWT_SECRET}
