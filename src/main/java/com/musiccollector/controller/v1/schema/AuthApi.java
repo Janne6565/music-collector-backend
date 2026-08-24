@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 /**
  * Accounts, which are entirely optional.
@@ -86,4 +87,14 @@ public interface AuthApi {
     @ApiResponse(responseCode = "200", description = "The account")
     @ApiResponse(responseCode = "401", description = "Not signed in")
     ResponseEntity<UserDto> me();
+
+    @DeleteMapping("/me")
+    @Operation(
+            summary = "Delete the account and everything synced to it",
+            description = "Removes the server-side copy of the collection and every uploaded photo. "
+                    + "The client's local collection is untouched -- it belongs to the device, not "
+                    + "the account, and the app goes on working without one.")
+    @ApiResponse(responseCode = "204", description = "Deleted")
+    @ApiResponse(responseCode = "401", description = "Not signed in")
+    ResponseEntity<Void> deleteAccount();
 }

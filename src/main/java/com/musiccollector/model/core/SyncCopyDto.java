@@ -12,7 +12,10 @@ import java.util.Map;
 public record SyncCopyDto(
         String id,
         String releaseMbid,
+        /** The media grade, on the Goldmine scale. */
         String condition,
+        /** The sleeve grade, graded separately from the media. */
+        String sleeveCondition,
         Integer pricePaidCents,
         String currency,
         String purchasedOn,

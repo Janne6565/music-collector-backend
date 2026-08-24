@@ -1,5 +1,6 @@
 package com.musiccollector.services.auth;
 
+import com.musiccollector.entity.PhotoEntity;
 import com.musiccollector.entity.UserEntity;
 import com.musiccollector.model.action.LoginRequest;
 import com.musiccollector.model.action.RegisterRequest;
@@ -9,7 +10,9 @@ import com.musiccollector.model.core.UserDto;
 import com.musiccollector.model.exception.EmailAlreadyRegisteredException;
 import com.musiccollector.model.exception.InvalidCredentialsException;
 import com.musiccollector.model.exception.NotAuthenticatedException;
+import com.musiccollector.repository.PhotoRepository;
 import com.musiccollector.repository.UserRepository;
+import com.musiccollector.services.storage.StorageService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +39,8 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final PhotoRepository photoRepository;
+    private final StorageService storageService;
 
     @Transactional
     public Session register(RegisterRequest request) {
@@ -107,6 +112,23 @@ public class AuthService {
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
         log.debug("Revoked all sessions for user {}", user.getId());
+    }
+
+    /**
+     * Deletes the account and everything the server holds for it.
+     *
+     * The photo objects are removed first: the rows go with the user by cascade, and once
+     * they are gone nothing remembers which objects in the bucket were ever hers.
+     */
+    @Transactional
+    public void deleteAccount(UserEntity user) {
+        for (PhotoEntity photo : photoRepository.findAllByUserId(user.getId())) {
+            if (photo.getStorageKey() != null) {
+                storageService.delete(photo.getStorageKey());
+            }
+        }
+        userRepository.delete(user);
+        log.info("Deleted account {}", user.getId());
     }
 
     public static UserDto toDto(UserEntity user) {

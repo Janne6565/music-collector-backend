@@ -28,8 +28,12 @@ public class CopyEntity {
     @Column(name = "release_mbid", nullable = false)
     private String releaseMbid;
 
+    /** The media grade. Kept as `condition` because it is the field that already synced. */
     @Column(name = "condition")
     private String condition;
+
+    @Column(name = "sleeve_condition")
+    private String sleeveCondition;
 
     @Column(name = "price_paid_cents")
     private Integer pricePaidCents;

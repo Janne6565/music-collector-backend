@@ -73,6 +73,16 @@ public class AuthController implements AuthApi {
         return ResponseEntity.ok(AuthService.toDto(currentUser.require()));
     }
 
+    @Override
+    public ResponseEntity<Void> deleteAccount() {
+        authService.deleteAccount(currentUser.require());
+        // The refresh cookie now points at an account that no longer exists, so it is
+        // cleared here rather than left to expire on its own.
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, refreshCookieFactory.clear().toString())
+                .build();
+    }
+
     private ResponseEntity<SessionDto> deliver(AuthService.Session session, TokenMode mode) {
         if (mode == TokenMode.DIRECT) {
             SessionDto body = session.body();

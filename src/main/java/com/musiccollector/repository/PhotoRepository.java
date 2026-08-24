@@ -14,6 +14,8 @@ public interface PhotoRepository extends JpaRepository<PhotoEntity, UUID> {
 
     List<PhotoEntity> findAllByUserIdAndIdIn(UUID userId, Collection<UUID> ids);
 
+    List<PhotoEntity> findAllByUserId(UUID userId);
+
     /** Scoped by user so one account can never read another's photo by guessing an id. */
     Optional<PhotoEntity> findByIdAndUserId(UUID id, UUID userId);
 }
