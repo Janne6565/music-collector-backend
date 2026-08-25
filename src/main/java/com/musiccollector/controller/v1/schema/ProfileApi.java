@@ -34,7 +34,7 @@ public interface ProfileApi {
             description = "Prefix match on the handle only, never on anybody's name. Three characters minimum; a shorter query returns nothing rather than the start of the directory.")
     @ApiResponse(responseCode = "200", description = "Up to twenty matches, best first")
     @ApiResponse(responseCode = "429", description = "Too many searches from this address")
-    ResponseEntity<List<ProfileSummaryDto>> search(@RequestParam("q") String query);
+    ResponseEntity<List<ProfileSummaryDto>> searchProfiles(@RequestParam("q") String query);
 
     @GetMapping("/{handle}")
     @Operation(

@@ -133,7 +133,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -176,7 +175,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -219,7 +217,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -265,7 +262,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -308,7 +304,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -351,7 +346,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -397,7 +391,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": 5000,
         "fieldClocks": {
@@ -527,7 +520,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 7000,
         "deletedAt": null,
         "fieldClocks": {
@@ -570,7 +562,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 3000,
         "deletedAt": null,
         "fieldClocks": {
@@ -613,7 +604,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 3000,
         "deletedAt": null,
         "fieldClocks": {
@@ -659,7 +649,6 @@
         "notes": "Sleeve is sharp, no seam splits.",
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -702,7 +691,6 @@
         "notes": "Plays clean after a wash.",
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -745,7 +733,6 @@
         "notes": "Plays clean after a wash.",
         "notesConflict": "Sleeve is sharp, no seam splits.",
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -791,7 +778,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -834,7 +820,6 @@
         "notes": "Bought at the Sunday market.",
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -877,7 +862,6 @@
         "notes": "Bought at the Sunday market.",
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -923,7 +907,6 @@
         "notes": "Gatefold.",
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -966,7 +949,6 @@
         "notes": "Gatefold.",
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1009,7 +991,6 @@
         "notes": "Gatefold.",
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1184,7 +1165,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1227,7 +1207,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1270,7 +1249,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1316,7 +1294,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1359,7 +1336,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1402,7 +1378,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1448,7 +1423,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1491,7 +1465,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1534,7 +1507,6 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
-        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {

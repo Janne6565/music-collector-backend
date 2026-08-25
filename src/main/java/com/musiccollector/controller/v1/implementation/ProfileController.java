@@ -26,7 +26,7 @@ public class ProfileController implements ProfileApi {
     private final CurrentUser currentUser;
 
     @Override
-    public ResponseEntity<List<ProfileSummaryDto>> search(String query) {
+    public ResponseEntity<List<ProfileSummaryDto>> searchProfiles(String query) {
         return ResponseEntity.ok(profileService.search(viewerId(), query));
     }
 
