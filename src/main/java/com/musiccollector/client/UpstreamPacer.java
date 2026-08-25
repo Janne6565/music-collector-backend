@@ -14,8 +14,20 @@ public class UpstreamPacer {
     private long nextSlotNanos;
 
     public UpstreamPacer(int requestsPerSecond) {
-        this.minimumGapNanos = 1_000_000_000L / requestsPerSecond;
+        this(1_000_000_000L / requestsPerSecond);
+    }
+
+    private UpstreamPacer(long minimumGapNanos) {
+        this.minimumGapNanos = minimumGapNanos;
         this.nextSlotNanos = System.nanoTime();
+    }
+
+    /**
+     * Discogs publishes its quota per minute rather than per second — 25 anonymous, 60 with
+     * a token — and neither divides into a whole number of requests per second.
+     */
+    public static UpstreamPacer perMinute(int requestsPerMinute) {
+        return new UpstreamPacer(60_000_000_000L / requestsPerMinute);
     }
 
     public synchronized void awaitSlot() {
