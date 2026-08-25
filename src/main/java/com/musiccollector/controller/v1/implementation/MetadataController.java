@@ -59,6 +59,11 @@ public class MetadataController implements MetadataApi {
     }
 
     @Override
+    public ResponseEntity<List<ReleaseDto>> getReleases(List<String> releaseIds) {
+        return ResponseEntity.ok(metadataService.getReleases(releaseIds));
+    }
+
+    @Override
     public ResponseEntity<ReleaseDto> getRelease(String releaseId) {
         return ResponseEntity.ok(metadataService.getRelease(releaseId));
     }

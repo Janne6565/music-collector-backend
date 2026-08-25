@@ -114,6 +114,20 @@ public interface MetadataApi {
     ResponseEntity<List<AlbumCoverDto>> albumCovers(
             @RequestParam("albumId") @Size(min = 1, max = 100) List<@NotBlank @Size(max = 120) String> albumIds);
 
+    @GetMapping("/releases")
+    @Operation(
+            summary = "A set of releases, from the mirror only",
+            description = "What a device that has just signed in needs: its copies arrive over sync as "
+                    + "release *references*, and the metadata behind them is a shared cache that "
+                    + "travels separately. Answered from the local mirror and never from a catalogue — "
+                    + "a collection of two hundred records must not become two hundred upstream "
+                    + "lookups — so an id the mirror has never seen is simply absent from the response "
+                    + "rather than a 404. Hand-entered `local:` releases are left out too: they are "
+                    + "derived from the copy itself and were never in any catalogue.")
+    @ApiResponse(responseCode = "200", description = "The releases the mirror holds, in no guaranteed order")
+    ResponseEntity<List<ReleaseDto>> getReleases(
+            @RequestParam("releaseId") @Size(min = 1, max = 100) List<@NotBlank @Size(max = 120) String> releaseIds);
+
     @GetMapping("/releases/{releaseId}")
     @Operation(summary = "Full detail for one release, including its cover theme",
             description = "The cover palette is sampled on the first lookup and reused afterwards.")

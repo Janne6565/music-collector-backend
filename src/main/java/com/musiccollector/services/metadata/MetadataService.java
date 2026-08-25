@@ -33,9 +33,11 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -367,6 +369,52 @@ public class MetadataService {
             applyCoverPalette(entity);
         }
         return toDto(entity);
+    }
+
+    /**
+     * The mirror's answer for a set of releases, for a device that holds copies but no metadata.
+     *
+     * <p>Sync moves copies, wishes and photos — never the catalogue, which is a shared cache any
+     * client may drop and refill. So a second device signs in, receives thirty copies naming
+     * thirty releases it has never heard of, and has nothing to draw. This is where it gets them.
+     *
+     * <p>Mirror only, deliberately. {@link #getRelease} may fall through to MusicBrainz for a
+     * single missing release; doing that per row here would turn one sign-in into a queue of
+     * paced upstream calls. Every release a copy can name was mirrored when somebody searched for
+     * it, so the mirror is the right answer, and an id it does not hold is left out of the
+     * response — the client keeps its placeholder and asks again on the next sync.
+     */
+    @Transactional(readOnly = true)
+    public List<ReleaseDto> getReleases(Collection<String> releaseIds) {
+        Set<String> wanted = new LinkedHashSet<>();
+        for (String releaseId : releaseIds) {
+            // A hand-entered release ("local:<copy id>") is derived from the copy itself.
+            if (releaseId == null || releaseId.isBlank() || releaseId.startsWith("local:")) {
+                continue;
+            }
+            wanted.add(ExternalRef.parse(releaseId).toString());
+        }
+        if (wanted.isEmpty()) {
+            return List.of();
+        }
+
+        List<ReleaseEntity> releases = releaseRepository.findAllByExternalIdIn(wanted);
+
+        // The album id every release carries, resolved in one query rather than per row: this
+        // is the one path that maps a hundred releases at a time.
+        Map<UUID, String> albumIds = new HashMap<>();
+        List<UUID> groupIds = releases.stream()
+                .map(ReleaseEntity::getReleaseGroupId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        for (ReleaseGroupEntity group : releaseGroupRepository.findAllById(groupIds)) {
+            albumIds.put(group.getId(), group.getExternalId());
+        }
+
+        return releases.stream()
+                .map(release -> MetadataMapper.toDto(release, albumIds.get(release.getReleaseGroupId())))
+                .toList();
     }
 
     /** Discogs' half of {@link #upsert}: mirror it once, then serve it from here. */

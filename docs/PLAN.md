@@ -92,6 +92,24 @@ Two traps found by testing, both of which lose data:
 - A delete is an ordinary **stamped** write of a tombstone. An unstamped one loses every
   merge, so the store deliberately exposes no unclocked delete at all.
 
+**The catalogue does not travel inside a sync batch.** A copy names a release; it never
+carries one. Releases are a shared mirror of MusicBrainz and Discogs that any client may
+drop and refill, and they are the same rows for everybody — putting them in a per-user
+batch would replicate a public cache through a private channel. So they move over
+`GET /api/v1/metadata/releases?releaseId=…`, answered from the mirror only and never from
+an upstream catalogue: two hundred records arriving on a second device must not become two
+hundred paced upstream lookups, and an id the mirror does not hold is simply absent rather
+than a 404.
+
+The half of that which was missing until 2026-08-25 is the client's: nothing refilled the
+release cache after a pull, only the add and detail screens ever wrote to it. A browser
+that signed in for the first time therefore pulled thirty copies and drew thirty untitled
+placeholders — "30 copies · 1 release". The sync engine now asks its transport for the
+releases the store lacks, over the **whole local collection** rather than the page it just
+pulled, so a device left blank by an older build heals on its next sync instead of only on
+its next new record. Hand-entered `local:` releases are never asked for: they are derived
+from the copy itself.
+
 **The merge is written once and shared.** `merge-fixture.json` is hand-authored and
 committed to all three repositories; the TypeScript and Java implementations are each
 tested against it, three ways per case — the expected result, commutativity, and
