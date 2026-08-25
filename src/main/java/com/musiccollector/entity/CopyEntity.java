@@ -35,9 +35,9 @@ public class CopyEntity {
     @Column(name = "sleeve_condition")
     private String sleeveCondition;
 
-    /** Show the release's own artwork rather than this copy's first photo. */
-    @Column(name = "prefer_catalog_art", nullable = false)
-    private boolean preferCatalogArt;
+    /** AUTO, PREFERRED or HIDDEN — what this copy has said about the release's artwork. */
+    @Column(name = "catalog_art", nullable = false)
+    private String catalogArt;
 
     @Column(name = "price_paid_cents")
     private Integer pricePaidCents;

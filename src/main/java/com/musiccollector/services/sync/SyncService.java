@@ -298,8 +298,8 @@ public class SyncService {
         entity.setReleaseId(dto.releaseId());
         entity.setCondition(dto.condition());
         entity.setSleeveCondition(dto.sleeveCondition());
-        // Absent means a client older than the field, which is the same as not preferring it.
-        entity.setPreferCatalogArt(Boolean.TRUE.equals(dto.preferCatalogArt()));
+        // Absent means a client older than the field, which is the same as having said nothing.
+        entity.setCatalogArt(dto.catalogArt() == null ? "AUTO" : dto.catalogArt());
         entity.setPricePaidCents(dto.pricePaidCents());
         entity.setCurrency(dto.currency() == null ? "EUR" : dto.currency());
         entity.setPurchasedOn(dto.purchasedOn());
@@ -318,7 +318,7 @@ public class SyncService {
                 entity.getReleaseId(),
                 entity.getCondition(),
                 entity.getSleeveCondition(),
-                entity.isPreferCatalogArt(),
+                entity.getCatalogArt(),
                 entity.getPricePaidCents(),
                 entity.getCurrency(),
                 entity.getPurchasedOn(),

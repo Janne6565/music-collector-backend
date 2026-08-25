@@ -27,13 +27,13 @@ public record SyncCopyDto(
         /** The sleeve grade, graded separately from the media. */
         String sleeveCondition,
         /**
-         * Show the release's own artwork instead of the copy's first photo.
+         * What the copy has said about the release's own artwork: {@code AUTO},
+         * {@code PREFERRED} or {@code HIDDEN}.
          *
-         * Boxed, because a client older than this field sends nothing at all and that has
-         * to stay distinguishable from a deliberate {@code false} while it travels. It is
-         * read as {@code false} the moment it lands — see {@code SyncService.apply}.
+         * Null on the wire means a client older than the field, which is read as
+         * {@code AUTO} the moment it lands — see {@code SyncService.apply}.
          */
-        Boolean preferCatalogArt,
+        String catalogArt,
         Integer pricePaidCents,
         String currency,
         String purchasedOn,

@@ -32,7 +32,7 @@ public final class CopyMerge {
             "releaseId",
             "condition",
             "sleeveCondition",
-            "preferCatalogArt",
+            "catalogArt",
             "pricePaidCents",
             "currency",
             "purchasedOn",
@@ -77,7 +77,7 @@ public final class CopyMerge {
                 (String) values.get("releaseId"),
                 (String) values.get("condition"),
                 (String) values.get("sleeveCondition"),
-                (Boolean) values.get("preferCatalogArt"),
+                (String) values.get("catalogArt"),
                 (Integer) values.get("pricePaidCents"),
                 (String) values.get("currency"),
                 (String) values.get("purchasedOn"),
@@ -144,7 +144,7 @@ public final class CopyMerge {
             case "releaseId" -> copy.releaseId();
             case "condition" -> copy.condition();
             case "sleeveCondition" -> copy.sleeveCondition();
-            case "preferCatalogArt" -> copy.preferCatalogArt();
+            case "catalogArt" -> copy.catalogArt();
             case "pricePaidCents" -> copy.pricePaidCents();
             case "currency" -> copy.currency();
             case "purchasedOn" -> copy.purchasedOn();
