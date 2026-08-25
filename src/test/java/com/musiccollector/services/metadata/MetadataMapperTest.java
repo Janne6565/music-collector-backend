@@ -182,14 +182,14 @@ class MetadataMapperTest {
         assertThat(MetadataMapper.discCount(release(null, null, null, "1970"))).isNull();
     }
 
-    private static final UUID GROUP = UUID.fromString("b0a6f7a4-0000-4000-8000-000000000002");
+    private static final String GROUP = "musicbrainz:b0a6f7a4-0000-4000-8000-000000000002";
     private static final String COVER_URL =
             "https://coverartarchive.org/release/b0a6f7a4-0000-4000-8000-000000000001/front-500";
 
     private static ReleaseEntity releaseEntity(Boolean hasCoverArt) {
         ReleaseEntity entity = new ReleaseEntity();
         entity.setId(UUID.randomUUID());
-        entity.setMbid(UUID.fromString("b0a6f7a4-0000-4000-8000-000000000001"));
+        entity.setExternalId("musicbrainz:b0a6f7a4-0000-4000-8000-000000000001");
         entity.setTitle("Remain in Light");
         entity.setArtistName("Talking Heads");
         entity.setFormat(Format.VINYL);

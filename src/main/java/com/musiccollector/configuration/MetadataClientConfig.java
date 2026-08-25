@@ -10,7 +10,12 @@ import org.springframework.web.client.RestClient;
 import java.time.Duration;
 
 @Configuration
-@EnableConfigurationProperties({MusicBrainzProperties.class, JwtProperties.class, OAuthProperties.class})
+@EnableConfigurationProperties({
+    MusicBrainzProperties.class,
+    DiscogsProperties.class,
+    JwtProperties.class,
+    OAuthProperties.class
+})
 public class MetadataClientConfig {
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
@@ -30,6 +35,23 @@ public class MetadataClientConfig {
                 .defaultHeader("User-Agent", properties.userAgent())
                 .requestFactory(timeouts())
                 .build();
+    }
+
+    /**
+     * Discogs rejects the default Java User-Agent outright, and serves images only to a
+     * request that carries a token — so the token, when there is one, is a default header
+     * rather than something every call site has to remember.
+     */
+    @Bean
+    public RestClient discogsRestClient(DiscogsProperties properties) {
+        RestClient.Builder builder = RestClient.builder()
+                .baseUrl(properties.baseUrl())
+                .defaultHeader("User-Agent", properties.userAgent())
+                .requestFactory(timeouts());
+        if (properties.authenticated()) {
+            builder = builder.defaultHeader("Authorization", "Discogs token=" + properties.token());
+        }
+        return builder.build();
     }
 
     @Bean

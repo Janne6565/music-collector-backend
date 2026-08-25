@@ -10,7 +10,7 @@ class ReleaseDtoTest {
 
     private static ReleaseDto with(String label, String catalogNumber, String country) {
         return new ReleaseDto(
-                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                "musicbrainz:" + UUID.randomUUID(), "musicbrainz:" + UUID.randomUUID(),
                 "Remain in Light", "Talking Heads", 1980, Format.VINYL,
                 label, catalogNumber, country, null, null, null, null, null, null);
     }

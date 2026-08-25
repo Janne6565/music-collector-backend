@@ -8,6 +8,8 @@ import com.musiccollector.entity.ReleaseEntity;
 import com.musiccollector.entity.ReleaseGroupEntity;
 import com.musiccollector.model.core.AlbumDto;
 import com.musiccollector.model.core.ArtistDto;
+import com.musiccollector.model.core.ExternalRef;
+import com.musiccollector.model.core.ReleaseSource;
 import com.musiccollector.model.core.ReleaseDto;
 import com.musiccollector.model.exception.ReleaseNotFoundException;
 import com.musiccollector.repository.ReleaseGroupRepository;
@@ -123,8 +125,11 @@ public class MetadataService {
      * from the pressing table works offline afterwards.
      */
     @Transactional
-    public List<ReleaseDto> releasesInGroup(UUID releaseGroupMbid, int limit) {
-        return musicBrainzClient.findReleasesInGroup(releaseGroupMbid.toString(), limit).stream()
+    public List<ReleaseDto> releasesInGroup(String albumId, int limit) {
+        // Only MusicBrainz albums have a release-group id to page by. A Discogs master is
+        // reached by artist and title instead, which is the next change, not this one.
+        ExternalRef ref = ExternalRef.parse(albumId);
+        return musicBrainzClient.findReleasesInGroup(ref.id(), limit).stream()
                 .map(this::upsert)
                 .flatMap(Optional::stream)
                 .toList();
@@ -135,13 +140,14 @@ public class MetadataService {
      * persisted on the first lookup and reused by every caller afterwards.
      */
     @Transactional
-    public ReleaseDto getRelease(UUID mbid) {
+    public ReleaseDto getRelease(String releaseId) {
+        ExternalRef ref = ExternalRef.parse(releaseId);
         ReleaseEntity entity = releaseRepository
-                .findByMbid(mbid)
+                .findByExternalId(ref.toString())
                 .or(() -> musicBrainzClient
-                        .lookupRelease(mbid.toString())
+                        .lookupRelease(ref.id())
                         .flatMap(this::persist))
-                .orElseThrow(() -> new ReleaseNotFoundException(mbid));
+                .orElseThrow(() -> new ReleaseNotFoundException(releaseId));
 
         // Skipped once we know there is no cover: without this the palette fetch runs on
         // every single lookup of an artless release, and always comes back empty.
@@ -153,7 +159,7 @@ public class MetadataService {
 
     private Optional<ReleaseDto> upsert(MusicBrainzResponses.Release release) {
         return releaseRepository
-                .findByMbid(UUID.fromString(release.id()))
+                .findByExternalId(ExternalRef.musicBrainz(release.id()).toString())
                 .or(() -> persist(release))
                 .map(this::toDto);
     }
@@ -169,7 +175,7 @@ public class MetadataService {
 
         ReleaseEntity entity = new ReleaseEntity();
         entity.setId(UUID.randomUUID());
-        entity.setMbid(UUID.fromString(release.id()));
+        entity.setExternalId(ExternalRef.musicBrainz(release.id()).toString());
         entity.setReleaseGroupId(group.getId());
         entity.setTitle(release.title() == null ? group.getTitle() : release.title());
         entity.setArtistName(MetadataMapper.artistName(release));
@@ -192,11 +198,11 @@ public class MetadataService {
     }
 
     private ReleaseGroupEntity ensureReleaseGroup(MusicBrainzResponses.Release release) {
-        UUID groupMbid = UUID.fromString(release.releaseGroup().id());
-        return releaseGroupRepository.findByMbid(groupMbid).orElseGet(() -> {
+        String groupRef = ExternalRef.musicBrainz(release.releaseGroup().id()).toString();
+        return releaseGroupRepository.findByExternalId(groupRef).orElseGet(() -> {
             ReleaseGroupEntity group = new ReleaseGroupEntity();
             group.setId(UUID.randomUUID());
-            group.setMbid(groupMbid);
+            group.setExternalId(groupRef);
             group.setTitle(Optional.ofNullable(release.releaseGroup().title())
                     .orElseGet(() -> Optional.ofNullable(release.title()).orElse("Untitled")));
             group.setArtistName(MetadataMapper.artistName(release));
@@ -215,7 +221,13 @@ public class MetadataService {
      * never told us about, eventually get a truthful answer.
      */
     private void applyCoverPalette(ReleaseEntity entity) {
-        Optional<byte[]> thumbnail = coverArtClient.fetchThumbnail(entity.getMbid().toString());
+        // The archive is keyed by MusicBrainz mbid, so a Discogs pressing has no palette to
+        // sample here — its cover comes from Discogs itself.
+        ExternalRef ref = ExternalRef.parse(entity.getExternalId());
+        if (ref.source() != ReleaseSource.MUSICBRAINZ) {
+            return;
+        }
+        Optional<byte[]> thumbnail = coverArtClient.fetchThumbnail(ref.id());
         entity.setHasCoverArt(thumbnail.isPresent());
 
         thumbnail.flatMap(colorExtractor::extract).ifPresentOrElse(palette -> {
@@ -223,17 +235,17 @@ public class MetadataService {
             entity.setAccentColor(palette.accentColor());
             entity.setLightness(palette.lightness());
             log.debug("Sampled cover for {}: {} (lightness {})",
-                    entity.getMbid(), palette.dominantColor(), palette.lightness());
-        }, () -> log.debug("No cover art for release {}", entity.getMbid()));
+                    entity.getExternalId(), palette.dominantColor(), palette.lightness());
+        }, () -> log.debug("No cover art for release {}", entity.getExternalId()));
 
         releaseRepository.save(entity);
     }
 
     private ReleaseDto toDto(ReleaseEntity entity) {
-        UUID groupMbid = releaseGroupRepository
+        String albumId = releaseGroupRepository
                 .findById(entity.getReleaseGroupId())
-                .map(ReleaseGroupEntity::getMbid)
+                .map(ReleaseGroupEntity::getExternalId)
                 .orElse(null);
-        return MetadataMapper.toDto(entity, groupMbid);
+        return MetadataMapper.toDto(entity, albumId);
     }
 }

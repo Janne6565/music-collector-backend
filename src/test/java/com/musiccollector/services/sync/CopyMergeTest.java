@@ -80,6 +80,20 @@ class CopyMergeTest {
     }
 
     @Test
+    void stillReadsACopyPushedUnderTheOldFieldName() throws IOException {
+        // A client deployed before the rename pushes `releaseMbid`. Reading that as absent
+        // would detach the copy from its release, silently, inside a sync batch — so the
+        // order of the client and server deploys must not matter.
+        SyncCopyDto copy = MAPPER.readValue(
+                """
+                {"id":"c1","releaseMbid":"musicbrainz:r1","currency":"EUR","createdAt":1,"fieldClocks":{}}
+                """,
+                SyncCopyDto.class);
+
+        assertThat(copy.releaseId()).isEqualTo("musicbrainz:r1");
+    }
+
+    @Test
     void refusesToMergeNothing() {
         assertThatThrownBy(() -> CopyMerge.merge(null, null)).isInstanceOf(IllegalArgumentException.class);
     }
@@ -100,7 +114,7 @@ class CopyMergeTest {
 
     private static SyncCopyDto withId(SyncCopyDto copy, String id) {
         return new SyncCopyDto(
-                id, copy.releaseMbid(), copy.condition(), copy.sleeveCondition(), copy.pricePaidCents(),
+                id, copy.releaseId(), copy.condition(), copy.sleeveCondition(), copy.pricePaidCents(),
                 copy.currency(),
                 copy.purchasedOn(), copy.purchasedAt(), copy.notes(), copy.notesConflict(), copy.rating(),
                 copy.createdAt(), copy.deletedAt(), copy.fieldClocks());

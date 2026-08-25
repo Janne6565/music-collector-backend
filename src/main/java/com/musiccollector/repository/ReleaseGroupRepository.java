@@ -8,5 +8,5 @@ import java.util.UUID;
 
 public interface ReleaseGroupRepository extends JpaRepository<ReleaseGroupEntity, UUID> {
 
-    Optional<ReleaseGroupEntity> findByMbid(UUID mbid);
+    Optional<ReleaseGroupEntity> findByExternalId(String externalId);
 }

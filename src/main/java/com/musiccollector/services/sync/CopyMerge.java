@@ -29,7 +29,7 @@ public final class CopyMerge {
      * for readability; the merge is per key.
      */
     public static final List<String> MERGEABLE_FIELDS = List.of(
-            "releaseMbid",
+            "releaseId",
             "condition",
             "sleeveCondition",
             "pricePaidCents",
@@ -73,7 +73,7 @@ public final class CopyMerge {
 
         return new SyncCopyDto(
                 local.id(),
-                (String) values.get("releaseMbid"),
+                (String) values.get("releaseId"),
                 (String) values.get("condition"),
                 (String) values.get("sleeveCondition"),
                 (Integer) values.get("pricePaidCents"),
@@ -139,7 +139,7 @@ public final class CopyMerge {
 
     private static Object valueOf(SyncCopyDto copy, String field) {
         return switch (field) {
-            case "releaseMbid" -> copy.releaseMbid();
+            case "releaseId" -> copy.releaseId();
             case "condition" -> copy.condition();
             case "sleeveCondition" -> copy.sleeveCondition();
             case "pricePaidCents" -> copy.pricePaidCents();

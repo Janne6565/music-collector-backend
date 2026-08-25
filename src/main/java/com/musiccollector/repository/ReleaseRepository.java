@@ -10,9 +10,9 @@ import java.util.UUID;
 
 public interface ReleaseRepository extends JpaRepository<ReleaseEntity, UUID> {
 
-    Optional<ReleaseEntity> findByMbid(UUID mbid);
+    Optional<ReleaseEntity> findByExternalId(String externalId);
 
-    List<ReleaseEntity> findAllByMbidIn(Collection<UUID> mbids);
+    List<ReleaseEntity> findAllByExternalIdIn(Collection<String> externalIds);
 
     /** Barcode scans check the local mirror before ever calling MusicBrainz. */
     List<ReleaseEntity> findAllByBarcode(String barcode);

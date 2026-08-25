@@ -262,7 +262,7 @@ public class SyncService {
     }
 
     private void applyWish(WishlistItemEntity entity, SyncWishDto dto) {
-        entity.setReleaseGroupMbid(dto.releaseGroupMbid());
+        entity.setAlbumId(dto.albumId());
         entity.setTitle(dto.title() == null ? "Untitled" : dto.title());
         entity.setArtistName(dto.artistName() == null ? "Unknown artist" : dto.artistName());
         entity.setYear(dto.year());
@@ -276,7 +276,7 @@ public class SyncService {
     private SyncWishDto toWishDto(WishlistItemEntity entity) {
         return new SyncWishDto(
                 entity.getId().toString(),
-                entity.getReleaseGroupMbid(),
+                entity.getAlbumId(),
                 entity.getTitle(),
                 entity.getArtistName(),
                 entity.getYear(),
@@ -295,7 +295,7 @@ public class SyncService {
     }
 
     private void apply(CopyEntity entity, SyncCopyDto dto) {
-        entity.setReleaseMbid(dto.releaseMbid());
+        entity.setReleaseId(dto.releaseId());
         entity.setCondition(dto.condition());
         entity.setSleeveCondition(dto.sleeveCondition());
         entity.setPricePaidCents(dto.pricePaidCents());
@@ -313,7 +313,7 @@ public class SyncService {
     private SyncCopyDto toDto(CopyEntity entity) {
         return new SyncCopyDto(
                 entity.getId().toString(),
-                entity.getReleaseMbid(),
+                entity.getReleaseId(),
                 entity.getCondition(),
                 entity.getSleeveCondition(),
                 entity.getPricePaidCents(),

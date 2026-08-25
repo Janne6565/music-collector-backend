@@ -42,12 +42,12 @@ public class MetadataController implements MetadataApi {
     }
 
     @Override
-    public ResponseEntity<List<ReleaseDto>> releasesInGroup(UUID mbid, int limit) {
-        return ResponseEntity.ok(metadataService.releasesInGroup(mbid, limit));
+    public ResponseEntity<List<ReleaseDto>> releasesInGroup(String albumId, int limit) {
+        return ResponseEntity.ok(metadataService.releasesInGroup(albumId, limit));
     }
 
     @Override
-    public ResponseEntity<ReleaseDto> getRelease(UUID mbid) {
-        return ResponseEntity.ok(metadataService.getRelease(mbid));
+    public ResponseEntity<ReleaseDto> getRelease(String releaseId) {
+        return ResponseEntity.ok(metadataService.getRelease(releaseId));
     }
 }

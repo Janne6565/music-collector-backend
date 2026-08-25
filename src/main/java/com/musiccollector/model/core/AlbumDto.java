@@ -14,7 +14,8 @@ import java.util.UUID;
  * discography that did not separate them would bury the four records anyone is looking for.
  */
 public record AlbumDto(
-        UUID releaseGroupMbid,
+        /** Source-qualified: "musicbrainz:<uuid>" or "discogs:<int>". */
+        String albumId,
         String title,
         String artistName,
         Integer year,

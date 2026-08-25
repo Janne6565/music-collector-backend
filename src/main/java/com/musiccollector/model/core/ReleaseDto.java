@@ -9,9 +9,10 @@ import java.util.UUID;
  * the label/catalog/country triple live here rather than on the release group.
  */
 public record ReleaseDto(
-        UUID id,
-        UUID mbid,
-        UUID releaseGroupMbid,
+        /** Source-qualified: "musicbrainz:<uuid>" or "discogs:<int>". */
+        String id,
+        /** The album this is a pressing of, source-qualified the same way. */
+        String albumId,
         String title,
         String artistName,
         Integer year,
