@@ -177,6 +177,25 @@ screen keeps reading a `Release` and none of them needs a branch. The CSV export
 carried the human-readable columns; the importer now reads them back, so a hand-entered
 copy survives a round trip instead of being skipped.
 
+## Changing the format of a copy
+
+The catalogue answers for the *pressing*, but a collection is allowed to hold a cassette
+of a record MusicBrainz only lists as vinyl. `manualFormat` is therefore the one manual
+field a **matched** copy may also carry: set, it overrides the release's format; null, the
+archive's answer stands. Picking the catalogue's own format again clears it.
+
+The alternative — re-matching the copy to a release of the right format — throws away its
+photos, grades, price and notes to fix one word, and for a format nobody catalogued there
+is no release to point at.
+
+No migration: the field, its clock and its sync contract already existed for hand-entered
+copies. Everything that shows, filters or counts a copy's format goes through
+`copyFormat(copy, release)` in the shared package, so the shelf chip, its count, the badge
+and the silhouette cannot disagree about the same copy. Both stores read it the same way
+(the mobile SQL coalesces the copy's answer *first*), and the CSV round trip carries an
+override back in — except a blank format column, which parses as `OTHER` and would
+otherwise mark every row of a foreign file Other.
+
 ## Design notes carried from the deck
 
 - Tokens: bg `#faf8f5`, dark `#141311`, ink `#191713`, accent `#a2573a` (dark variant
