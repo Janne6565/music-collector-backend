@@ -75,20 +75,21 @@ public interface MetadataApi {
             @RequestParam(value = "type", required = false) @Size(max = 30) String primaryType,
             @RequestParam(value = "limit", defaultValue = "25") @Min(1) @Max(100) int limit);
 
-    @GetMapping("/release-groups/{mbid}/releases")
+    @GetMapping("/albums/{albumId}/releases")
     @Operation(
             summary = "Every pressing of one album",
             description = "Bitches Brew has 47, so this pages rather than pretending the list is short.")
     @ApiResponse(responseCode = "200", description = "The pressings, possibly empty")
     @ApiResponse(responseCode = "502", description = "MusicBrainz is unreachable")
     ResponseEntity<List<ReleaseDto>> releasesInGroup(
-            @PathVariable UUID mbid,
+            @PathVariable("albumId") @NotBlank @Size(max = 120) String albumId,
             @RequestParam(value = "limit", defaultValue = "25") @Min(1) @Max(100) int limit);
 
-    @GetMapping("/releases/{mbid}")
+    @GetMapping("/releases/{releaseId}")
     @Operation(summary = "Full detail for one release, including its cover theme",
             description = "The cover palette is sampled on the first lookup and reused afterwards.")
     @ApiResponse(responseCode = "200", description = "The release")
     @ApiResponse(responseCode = "404", description = "No such release")
-    ResponseEntity<ReleaseDto> getRelease(@PathVariable UUID mbid);
+    ResponseEntity<ReleaseDto> getRelease(
+            @PathVariable("releaseId") @NotBlank @Size(max = 120) String releaseId);
 }

@@ -50,7 +50,7 @@ class SyncServiceCursorTest {
         CopyEntity entity = new CopyEntity();
         entity.setId(UUID.randomUUID());
         entity.setUserId(USER);
-        entity.setReleaseMbid("rel");
+        entity.setReleaseId("rel");
         entity.setCurrency("EUR");
         entity.setCreatedAt(1L);
         entity.setFieldClocks("{}");
@@ -62,7 +62,7 @@ class SyncServiceCursorTest {
         WishlistItemEntity entity = new WishlistItemEntity();
         entity.setId(UUID.randomUUID());
         entity.setUserId(USER);
-        entity.setReleaseGroupMbid("group");
+        entity.setAlbumId("group");
         entity.setTitle("T");
         entity.setArtistName("A");
         entity.setCreatedAt(1L);

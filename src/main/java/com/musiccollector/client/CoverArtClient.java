@@ -29,8 +29,8 @@ public class CoverArtClient {
     }
 
     /** The public URL clients should render, whether or not the bytes were fetchable. */
-    public String frontCoverUrl(String releaseMbid) {
-        return baseUrl + "/release/" + releaseMbid + "/front-500";
+    public String frontCoverUrl(String releaseId) {
+        return baseUrl + "/release/" + releaseId + "/front-500";
     }
 
     /**
@@ -44,15 +44,15 @@ public class CoverArtClient {
     }
 
     /** The 250px thumbnail, used only for sampling the palette. */
-    public Optional<byte[]> fetchThumbnail(String releaseMbid) {
+    public Optional<byte[]> fetchThumbnail(String releaseId) {
         try {
             return Optional.ofNullable(restClient
                     .get()
-                    .uri("/release/{mbid}/front-250", releaseMbid)
+                    .uri("/release/{mbid}/front-250", releaseId)
                     .retrieve()
                     .body(byte[].class));
         } catch (RestClientException e) {
-            log.debug("No cover art for release {} ({})", releaseMbid, e.getMessage());
+            log.debug("No cover art for release {} ({})", releaseId, e.getMessage());
             return Optional.empty();
         }
     }

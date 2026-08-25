@@ -24,8 +24,8 @@ public class WishlistItemEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "release_group_mbid", nullable = false)
-    private String releaseGroupMbid;
+    @Column(name = "album_id", nullable = false)
+    private String albumId;
 
     @Column(nullable = false)
     private String title;

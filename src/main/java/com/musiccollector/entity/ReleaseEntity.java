@@ -25,8 +25,9 @@ public class ReleaseEntity {
     @Id
     private UUID id;
 
-    @Column(nullable = false, unique = true)
-    private UUID mbid;
+    /** "musicbrainz:<uuid>" or "discogs:<int>" — see ExternalRef for why it is one value. */
+    @Column(name = "external_id", nullable = false, unique = true)
+    private String externalId;
 
     @Column(name = "release_group_id", nullable = false)
     private UUID releaseGroupId;

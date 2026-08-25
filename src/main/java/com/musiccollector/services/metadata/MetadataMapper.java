@@ -5,6 +5,7 @@ import com.musiccollector.entity.ReleaseEntity;
 import com.musiccollector.model.core.AlbumDto;
 import com.musiccollector.model.core.ArtistDto;
 import com.musiccollector.model.core.CoverThemeDto;
+import com.musiccollector.model.core.ExternalRef;
 import com.musiccollector.model.core.Format;
 import com.musiccollector.model.core.ReleaseDto;
 
@@ -123,7 +124,7 @@ public final class MetadataMapper {
                         .filter(name -> name != null && !name.isBlank())
                         .collect(Collectors.joining(", "));
         return new AlbumDto(
-                UUID.fromString(group.id()),
+                ExternalRef.musicBrainz(group.id()).toString(),
                 group.title() == null ? "Untitled" : group.title(),
                 artist,
                 year(group.firstReleaseDate()),
@@ -131,7 +132,7 @@ public final class MetadataMapper {
                 coverArtUrl);
     }
 
-    public static ReleaseDto toDto(ReleaseEntity entity, UUID releaseGroupMbid) {
+    public static ReleaseDto toDto(ReleaseEntity entity, String albumId) {
         CoverThemeDto theme = entity.getDominantColor() == null || entity.getLightness() == null
                 ? null
                 : new CoverThemeDto(
@@ -140,9 +141,8 @@ public final class MetadataMapper {
                         entity.getLightness(),
                         entity.getLightness() < CoverPalette.DARK_CHROME_THRESHOLD);
         return new ReleaseDto(
-                entity.getId(),
-                entity.getMbid(),
-                releaseGroupMbid,
+                entity.getExternalId(),
+                albumId,
                 entity.getTitle(),
                 entity.getArtistName(),
                 entity.getYear(),

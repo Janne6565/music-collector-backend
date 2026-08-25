@@ -25,8 +25,8 @@ public class CopyEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "release_mbid", nullable = false)
-    private String releaseMbid;
+    @Column(name = "release_id", nullable = false)
+    private String releaseId;
 
     /** The media grade. Kept as `condition` because it is the field that already synced. */
     @Column(name = "condition")

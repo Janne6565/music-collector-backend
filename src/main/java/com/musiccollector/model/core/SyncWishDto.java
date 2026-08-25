@@ -1,5 +1,7 @@
 package com.musiccollector.model.core;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 import java.util.Map;
 
 /**
@@ -8,7 +10,8 @@ import java.util.Map;
  */
 public record SyncWishDto(
         String id,
-        String releaseGroupMbid,
+        /** Accepted as `releaseGroupMbid` too, for the same reason as SyncCopyDto#releaseId. */
+        @JsonAlias("releaseGroupMbid") String albumId,
         String title,
         String artistName,
         Integer year,

@@ -1,5 +1,7 @@
 package com.musiccollector.model.core;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 import java.util.Map;
 
 /**
@@ -11,7 +13,15 @@ import java.util.Map;
  */
 public record SyncCopyDto(
         String id,
-        String releaseMbid,
+        /**
+         * Source-qualified, and accepted under its old name too.
+         *
+         * A client deployed before the rename still pushes `releaseMbid`, and reading that
+         * as absent would detach the copy from its release — silently, in a sync batch.
+         * The alias makes the order of the two deploys stop mattering. It can go once no
+         * client of that vintage is left.
+         */
+        @JsonAlias("releaseMbid") String releaseId,
         /** The media grade, on the Goldmine scale. */
         String condition,
         /** The sleeve grade, graded separately from the media. */
