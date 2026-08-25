@@ -1,6 +1,7 @@
 package com.musiccollector.controller.v1.schema;
 
 import com.musiccollector.model.action.SendFriendRequest;
+import com.musiccollector.model.core.ActivityFeedDto;
 import com.musiccollector.model.core.FriendsOverviewDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -31,6 +32,14 @@ public interface FriendsApi {
     @ApiResponse(responseCode = "200", description = "The People panel")
     @ApiResponse(responseCode = "401", description = "Not signed in")
     ResponseEntity<FriendsOverviewDto> overview();
+
+    @GetMapping("/activity")
+    @Operation(
+            summary = "What your friends have been doing",
+            description = "Newest first. Imports never appear here, and a burst of single adds by one person collapses to one line. Visibility is applied on the way out, so a shelf that closes takes its history with it.")
+    @ApiResponse(responseCode = "200", description = "The feed")
+    @ApiResponse(responseCode = "401", description = "Not signed in")
+    ResponseEntity<ActivityFeedDto> activity();
 
     @PostMapping("/requests")
     @Operation(summary = "Ask a collector to be friends, by handle")

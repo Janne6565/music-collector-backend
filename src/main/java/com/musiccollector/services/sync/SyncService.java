@@ -9,7 +9,9 @@ import com.musiccollector.model.core.SyncPullDto;
 import com.musiccollector.model.core.SyncWishDto;
 import com.musiccollector.repository.CopyRepository;
 import com.musiccollector.repository.PhotoRepository;
+import com.musiccollector.model.core.CopyOrigin;
 import com.musiccollector.repository.WishlistItemRepository;
+import com.musiccollector.services.social.ActivityService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +49,7 @@ public class SyncService {
     private final WishlistItemRepository wishlistItemRepository;
     private final PhotoRepository photoRepository;
     private final com.musiccollector.services.storage.StorageService storageService;
+    private final ActivityService activityService;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -108,8 +111,9 @@ public class SyncService {
             UUID userId,
             List<SyncCopyDto> incoming,
             List<SyncWishDto> incomingWishes,
-            List<SyncPhotoDto> incomingPhotos) {
-        Pushed<SyncCopyDto> copies = pushCopies(userId, incoming);
+            List<SyncPhotoDto> incomingPhotos,
+            Map<String, String> origins) {
+        Pushed<SyncCopyDto> copies = pushCopies(userId, incoming, origins);
         Pushed<SyncWishDto> wishes = pushWishes(userId, incomingWishes);
         Pushed<SyncPhotoDto> photos = pushPhotos(userId, incomingPhotos);
         long cursor = Math.max(copies.highWaterMark(), Math.max(wishes.highWaterMark(), photos.highWaterMark()));
@@ -190,7 +194,7 @@ public class SyncService {
      */
     private record Pushed<T>(List<T> records, long highWaterMark) {}
 
-    private Pushed<SyncCopyDto> pushCopies(UUID userId, List<SyncCopyDto> incoming) {
+    private Pushed<SyncCopyDto> pushCopies(UUID userId, List<SyncCopyDto> incoming, Map<String, String> origins) {
         if (incoming.isEmpty()) {
             return new Pushed<>(List.of(), 0);
         }
@@ -207,6 +211,7 @@ public class SyncService {
         for (SyncCopyDto client : incoming) {
             UUID id = UUID.fromString(client.id());
             CopyEntity entity = stored.get(id);
+            boolean created = entity == null;
             SyncCopyDto merged = CopyMerge.merge(entity == null ? null : toDto(entity), client);
 
             CopyEntity target = entity == null ? newEntity(id, userId) : entity;
@@ -217,12 +222,53 @@ public class SyncService {
             target.setSyncSeq(copyRepository.nextSyncSeq());
             copyRepository.save(target);
 
+            announce(userId, id, created, merged, origins);
+
             highWaterMark = Math.max(highWaterMark, target.getSyncSeq());
             results.add(merged);
         }
 
         log.debug("Merged {} copies for user {}", results.size(), userId);
         return new Pushed<>(results, highWaterMark);
+    }
+
+    /**
+     * Tell the actor's friends, or take back what was said.
+     *
+     * <p>Only a row the server had never seen announces anything: an edit pushes the same
+     * copy again, and a record does not become news twice. A tombstone withdraws the line,
+     * because a feed saying somebody added a record they have since deleted is a claim about
+     * them that is no longer true.
+     */
+    private void announce(UUID userId, UUID copyId, boolean created, SyncCopyDto merged, Map<String, String> origins) {
+        if (merged.deletedAt() != null) {
+            activityService.forget(userId, copyId);
+            return;
+        }
+        if (!created) {
+            return;
+        }
+        activityService.recordCopyAdded(
+                userId,
+                copyId,
+                originOf(origins, merged.id()),
+                merged.releaseId(),
+                merged.manualTitle(),
+                merged.manualArtist(),
+                merged.createdAt());
+    }
+
+    /** An origin the client did not send, or one it sent that this build does not know, is silence. */
+    private static CopyOrigin originOf(Map<String, String> origins, String copyId) {
+        String raw = origins == null ? null : origins.get(copyId);
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return CopyOrigin.valueOf(raw);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private Pushed<SyncWishDto> pushWishes(UUID userId, List<SyncWishDto> incoming) {
@@ -241,6 +287,7 @@ public class SyncService {
         for (SyncWishDto client : incoming) {
             UUID id = UUID.fromString(client.id());
             WishlistItemEntity entity = stored.get(id);
+            boolean created = entity == null;
             SyncWishDto merged = WishMerge.merge(entity == null ? null : toWishDto(entity), client);
 
             WishlistItemEntity target = entity;
@@ -252,6 +299,16 @@ public class SyncService {
             applyWish(target, merged);
             target.setSyncSeq(copyRepository.nextSyncSeq());
             wishlistItemRepository.save(target);
+
+            // A wishlist is a list of things somebody is hunting for, which is exactly the
+            // sort of thing a friend can help with -- so wishes announce themselves whatever
+            // the batch's origin, and stop when the wish is taken back.
+            if (merged.deletedAt() != null) {
+                activityService.forget(userId, id);
+            } else if (created) {
+                activityService.recordWishAdded(
+                        userId, id, merged.albumId(), merged.title(), merged.artistName(), merged.createdAt());
+            }
 
             highWaterMark = Math.max(highWaterMark, target.getSyncSeq());
             results.add(merged);

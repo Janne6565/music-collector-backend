@@ -7,6 +7,7 @@ import com.musiccollector.model.core.SyncPullDto;
 import com.musiccollector.repository.CopyRepository;
 import com.musiccollector.repository.PhotoRepository;
 import com.musiccollector.repository.WishlistItemRepository;
+import com.musiccollector.services.social.ActivityService;
 import com.musiccollector.services.storage.StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,13 +38,19 @@ class SyncServiceCursorTest {
     @Mock private WishlistItemRepository wishlistItemRepository;
     @Mock private PhotoRepository photoRepository;
     @Mock private StorageService storageService;
+    @Mock private ActivityService activityService;
 
     private SyncService service;
 
     @BeforeEach
     void setUp() {
         service = new SyncService(
-                copyRepository, wishlistItemRepository, photoRepository, storageService, new ObjectMapper());
+                copyRepository,
+                wishlistItemRepository,
+                photoRepository,
+                storageService,
+                activityService,
+                new ObjectMapper());
     }
 
     private CopyEntity copy(long seq) {

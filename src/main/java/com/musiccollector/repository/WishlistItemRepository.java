@@ -25,4 +25,7 @@ public interface WishlistItemRepository extends JpaRepository<WishlistItemEntity
 
     @Query("SELECT COUNT(w) FROM WishlistItemEntity w WHERE w.userId = :userId AND w.deletedAt IS NULL")
     long countVisible(@Param("userId") UUID userId);
+
+    /** Whether this album is one they have been hunting for. */
+    List<WishlistItemEntity> findAllByUserIdAndAlbumIdAndDeletedAtIsNull(UUID userId, String albumId);
 }

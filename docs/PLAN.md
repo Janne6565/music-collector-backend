@@ -265,3 +265,39 @@ the app's own path segments — the public profile lives at `/@handle` and its w
 `15b` matches **Friedhelm Barg `@fbarg`** against the query `frie`, which is a match on his
 name rather than his handle. Handle-only search is the deliberate choice — a handle is
 picked to be found by, a real name is not — so the mock data is what gives, not the rule.
+
+### The feed
+
+Written on the way through sync, read back through `VisibilityService` every time.
+
+**Only the device knows why a copy exists.** An import of two hundred records and two
+hundred records typed in over a fortnight reach `/api/v1/sync` in the same shape, so the
+push carries an `origins` map beside the records — `MANUAL`, `CSV_IMPORT` or `FIRST_SYNC`,
+keyed by copy id. Beside them rather than on them: it is the reason for one push, not a
+property of the copy that has to survive or merge, and it matters exactly once, when the
+server first sees the row. A copy the map does not mention says nothing. Silence is the
+safe failure mode — a client too old to send this is one whose intent we cannot read, and
+`useFirstSyncLogic` would otherwise announce somebody's entire collection the first time
+they signed in.
+
+Only a row the server had never seen announces anything, so an edit does not repeat it, and
+a tombstone withdraws the line: a feed saying somebody added a record they have since
+deleted is a claim about them that is no longer true.
+
+**Timestamps are the device's own UTC, trusted, and clamped to never be in the future.** A
+copy added on a plane and synced two days later belongs where the person put it. What that
+cannot be allowed to buy is a permanent place at the top of every friend's feed, which is
+all the clamp prevents. `recorded_at` is kept beside `occurred_at` so a suspicious gap
+between them is still visible afterwards.
+
+**A burst collapses at read time**, not in the stored rows — adjacent `COPY_ADDED` events
+by one actor within two hours become one line, so the window can change without a
+migration. Adding a copy of an album already on the wishlist is recorded as
+`WISH_FULFILLED` rather than `COPY_ADDED`: "off the wishlist, onto the shelf" is the same
+event told better.
+
+**Visibility is applied on the way out.** Events are read from the actors' own rows at
+request time rather than fanned out into per-viewer inboxes. That is what makes "Only me"
+reach backwards — the lines do not have to be found and deleted from anywhere, they simply
+stop being readable — and it means no settings change has a rewrite job that can fail
+halfway.

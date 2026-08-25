@@ -2,8 +2,10 @@ package com.musiccollector.controller.v1.implementation;
 
 import com.musiccollector.controller.v1.schema.FriendsApi;
 import com.musiccollector.model.action.SendFriendRequest;
+import com.musiccollector.model.core.ActivityFeedDto;
 import com.musiccollector.model.core.FriendsOverviewDto;
 import com.musiccollector.security.CurrentUser;
+import com.musiccollector.services.social.ActivityService;
 import com.musiccollector.services.social.FriendshipService;
 import com.musiccollector.services.social.ProfileService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ public class FriendsController implements FriendsApi {
 
     private final FriendshipService friendshipService;
     private final ProfileService profileService;
+    private final ActivityService activityService;
     private final CurrentUser currentUser;
 
     @Override
@@ -33,8 +36,18 @@ public class FriendsController implements FriendsApi {
 
     @Override
     public ResponseEntity<Void> accept(UUID id) {
-        friendshipService.accept(currentUser.require().getId(), id);
+        UUID viewerId = currentUser.require().getId();
+        UUID requester = friendshipService.accept(viewerId, id);
+        // Recorded against the accepter and addressed to the person who asked: "Anna Reuter
+        // accepted your request" is news to them and to nobody else.
+        activityService.recordFriendshipAccepted(viewerId, requester);
         return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<ActivityFeedDto> activity() {
+        UUID viewerId = currentUser.require().getId();
+        return ResponseEntity.ok(activityService.feed(viewerId, friendshipService.friendIds(viewerId)));
     }
 
     @Override

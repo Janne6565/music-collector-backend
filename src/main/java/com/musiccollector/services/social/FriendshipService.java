@@ -74,13 +74,21 @@ public class FriendshipService {
         return friendship;
     }
 
+    /**
+     * Accept a request addressed to you, and return who asked.
+     *
+     * <p>The feed line about it is written by the caller rather than here. This service
+     * knows the graph and nothing else — telling it about activity would make it depend on
+     * a service that already depends on it, through visibility, to read the feed back.
+     */
     @Transactional
-    public void accept(UUID viewerId, UUID requestId) {
+    public UUID accept(UUID viewerId, UUID requestId) {
         FriendshipEntity friendship = pendingFor(viewerId, requestId);
         friendship.setStatus(FriendshipStatus.ACCEPTED);
         friendship.setRespondedAt(Instant.now());
         friendshipRepository.save(friendship);
         log.debug("User {} accepted friend request {}", viewerId, requestId);
+        return friendship.getRequesterId();
     }
 
     /**
