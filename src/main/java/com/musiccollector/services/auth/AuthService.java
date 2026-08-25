@@ -41,6 +41,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final PhotoRepository photoRepository;
     private final StorageService storageService;
+    private final ConsentService consentService;
 
     @Transactional
     public Session register(RegisterRequest request) {
@@ -59,6 +60,9 @@ public class AuthService {
         user.setCreatedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
+        // Inside the same transaction as the account itself: an account without its consent
+        // rows is the one state the record is there to make impossible.
+        consentService.recordSignUp(user.getId());
 
         log.debug("Registered user {}", user.getId());
         return issue(user, true);

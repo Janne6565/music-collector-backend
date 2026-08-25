@@ -376,3 +376,57 @@ the list throughout — backing out of the add flow costs nothing — and leaves
 copy exists, through the same automatic removal as any other add. That is also why there is
 no separate "take it off the wishlist" toggle: the undoable line is the one mechanism, and
 a second one would be a second answer to the same question.
+
+## Legal layer (turn 17)
+
+The German legal layer: an Impressum, a Datenschutzerklärung and Nutzungsbedingungen, a
+consent step at sign-up, and DSGVO self-service that does not go through an e-mail. The
+documents carry a DE/EN switch of their own; the app's UI language stays a separate
+setting, because which version binds you is a legal question and which language you read
+menus in is a preference.
+
+**The documents live in the shared package, not in each client.** They are the one kind of
+content where the two apps disagreeing is a real failure: § 5 DDG wants one identifiable
+provider, and an Impressum that reads differently on the website and in the app is worse
+than none. `legal/` exports the three documents as structured sections in both languages,
+plus the operator constants — every screen that prints an address, a controller or a contact
+reads them from there rather than typing them again. The German text is the binding
+original; the English is a courtesy translation of it, and says so on every page.
+
+**The server owns the document versions, not the client.** A consent record has to survive
+the document being rewritten, so `user_consents` (V22) stores which document, in which
+version, was accepted when — and the version is stamped from `ConsentDocument` on the server
+rather than taken from the request. A client three releases old can only say *that* the
+boxes were ticked; what it ticked is a fact about the server at that moment.
+
+Two ticks on the screen, three rows in the record: the agreement covers the terms and the
+privacy policy together, the age confirmation stands alone, and each has to be shown on its
+own afterwards. Both are `@NotNull @AssertTrue` on `RegisterRequest` — required rather than
+merely recorded, because a box the server would accept unticked is decoration. `@NotNull`
+matters as much as `@AssertTrue`: Bean Validation treats null as satisfying `@AssertTrue`,
+so a client that omits the fields would otherwise sail through. **This makes older clients
+unable to register** — including the iOS build already in the store, which needs an update
+before its sign-up screen works again. Signing in with an existing account is unaffected.
+
+The OAuth path records the same three consents when it creates an account. There is no form
+to put tick boxes in, so the provider buttons carry the legal notice line instead; the
+agreement is the same, so the record is the same.
+
+**Consent rows cascade with the account.** The deletion screen promises everything goes, and
+a proof-of-consent row still names the person it is about. Keeping one to prove a consent
+that no longer has a subject would make that promise false, so the privacy policy says
+plainly that the records go with the account.
+
+**The export is two exports, and which one you get depends on whether you have an account.**
+`GET /api/v1/account/export` is the Art. 15 and Art. 20 answer for what the *server* holds:
+account, consents, sharing settings, copies, wishlist, photo metadata, friendships and which
+sign-in providers are linked. It reuses the sync DTOs on purpose — portability means the file
+can be read back, and the shapes the app already speaks are the ones that can be. Photo bytes
+are not inlined; each photo's metadata carries the URL they live at. A device with no account
+has nothing on the server at all, so it exports from its own local store instead, which is
+also why the CSV export beside it stays client-built.
+
+Rectification and erasure needed no new endpoints: the name is already `PATCH /auth/me`,
+withdrawing sharing consent is the Sharing screen saved with everything private, and deletion
+is `DELETE /auth/me` as before — the typed-`LÖSCHEN` confirmation is a client-side gate on it,
+not a second endpoint.

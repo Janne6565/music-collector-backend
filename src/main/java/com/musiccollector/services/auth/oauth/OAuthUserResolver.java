@@ -5,6 +5,7 @@ import com.musiccollector.entity.UserEntity;
 import com.musiccollector.model.exception.OAuthFailedException;
 import com.musiccollector.repository.OAuthIdentityRepository;
 import com.musiccollector.repository.UserRepository;
+import com.musiccollector.services.auth.ConsentService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,7 @@ public class OAuthUserResolver {
 
     private final UserRepository userRepository;
     private final OAuthIdentityRepository identityRepository;
+    private final ConsentService consentService;
 
     @Transactional
     public UserEntity resolve(String provider, OAuthService.ExternalIdentity identity) {
@@ -76,6 +78,12 @@ public class OAuthUserResolver {
         user.setTokenVersion(0);
         user.setCreatedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
-        return userRepository.save(user);
+        UserEntity saved = userRepository.save(user);
+        // The provider buttons carry the legal notice instead of two tick boxes -- there is
+        // no form to put them in, and a screen that demands ticks before it will let you
+        // press "Continue with Apple" is a screen nobody finishes. The record is the same
+        // one a password sign-up leaves, because the agreement is the same.
+        consentService.recordSignUp(saved.getId());
+        return saved;
     }
 }

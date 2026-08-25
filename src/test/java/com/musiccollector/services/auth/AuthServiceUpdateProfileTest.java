@@ -25,13 +25,19 @@ class AuthServiceUpdateProfileTest {
     @Mock private JwtService jwtService;
     @Mock private PhotoRepository photoRepository;
     @Mock private StorageService storageService;
+    @Mock private ConsentService consentService;
 
     private AuthService service;
 
     @BeforeEach
     void setUp() {
         service = new AuthService(
-                userRepository, new BCryptPasswordEncoder(), jwtService, photoRepository, storageService);
+                userRepository,
+                new BCryptPasswordEncoder(),
+                jwtService,
+                photoRepository,
+                storageService,
+                consentService);
     }
 
     private UserEntity user(String displayName) {
