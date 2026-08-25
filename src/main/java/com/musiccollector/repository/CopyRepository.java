@@ -2,7 +2,9 @@ package com.musiccollector.repository;
 
 import com.musiccollector.entity.CopyEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -17,4 +19,22 @@ public interface CopyRepository extends JpaRepository<CopyEntity, UUID> {
 
     @Query(value = "SELECT nextval('copies_sync_seq')", nativeQuery = true)
     long nextSyncSeq();
+
+    /**
+     * What someone else is allowed to see: alive, not hidden one by one, oldest change
+     * last. The filter lives in the query rather than in a stream afterwards so that no
+     * caller can forget it.
+     */
+    @Query("""
+            SELECT c FROM CopyEntity c
+            WHERE c.userId = :userId AND c.deletedAt IS NULL AND c.hidden = FALSE
+            ORDER BY c.createdAt DESC
+            """)
+    List<CopyEntity> findVisible(@Param("userId") UUID userId, Pageable pageable);
+
+    @Query("""
+            SELECT COUNT(c) FROM CopyEntity c
+            WHERE c.userId = :userId AND c.deletedAt IS NULL AND c.hidden = FALSE
+            """)
+    long countVisible(@Param("userId") UUID userId);
 }

@@ -313,6 +313,8 @@ public class SyncService {
         entity.setNotes(dto.notes());
         entity.setNotesConflict(dto.notesConflict());
         entity.setRating(dto.rating());
+        // Absent means a client older than the field, which is the same as not hidden.
+        entity.setHidden(Boolean.TRUE.equals(dto.hidden()));
         entity.setCreatedAt(dto.createdAt());
         entity.setDeletedAt(dto.deletedAt());
         entity.setFieldClocks(writeClocks(dto.fieldClocks()));
@@ -338,6 +340,7 @@ public class SyncService {
                 entity.getNotes(),
                 entity.getNotesConflict(),
                 entity.getRating(),
+                entity.isHidden(),
                 entity.getCreatedAt(),
                 entity.getDeletedAt(),
                 readClocks(entity.getFieldClocks()));

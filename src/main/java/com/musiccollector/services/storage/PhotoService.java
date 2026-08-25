@@ -6,7 +6,9 @@ import com.musiccollector.model.core.PhotoUploadDto;
 import com.musiccollector.model.exception.PhotoNotFoundException;
 import com.musiccollector.model.exception.PhotoTooLargeException;
 import com.musiccollector.model.exception.UnsupportedPhotoTypeException;
+import com.musiccollector.repository.CopyRepository;
 import com.musiccollector.repository.PhotoRepository;
+import com.musiccollector.services.social.VisibilityService;
 import io.minio.GetObjectResponse;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -33,8 +35,10 @@ public class PhotoService {
             Set.of("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif");
 
     private final PhotoRepository photoRepository;
+    private final CopyRepository copyRepository;
     private final StorageService storageService;
     private final StorageProperties properties;
+    private final VisibilityService visibilityService;
 
     /**
      * Stores the bytes and records the metadata.
@@ -86,13 +90,48 @@ public class PhotoService {
         return new PhotoUploadDto(photoId.toString(), key, contentType, file.getSize());
     }
 
+    /**
+     * The bytes, for whoever is allowed to have them.
+     *
+     * <p>The gate is here rather than in the security config because it is not a property
+     * of the path: the same URL is served to the owner always, to a friend when the shelf
+     * is open to friends, and to a signed-out stranger only when the owner made the
+     * collection public. {@code viewerId} is null for that stranger.
+     *
+     * <p>Every refusal is a 404, not a 403. A distinguishable "you may not have this"
+     * would turn the endpoint into a way to confirm which photo ids exist.
+     *
+     * @param viewerId who is asking, or null for a signed-out visitor
+     */
     @Transactional(readOnly = true)
-    public Download download(UUID userId, UUID photoId) {
+    public Download download(UUID viewerId, UUID photoId) {
         PhotoEntity entity = photoRepository
-                .findByIdAndUserId(photoId, userId)
+                .findById(photoId)
                 .filter(photo -> photo.getDeletedAt() == null)
                 .orElseThrow(() -> new PhotoNotFoundException(photoId));
+        if (!maySee(viewerId, entity)) {
+            log.warn("Photo {} refused to viewer {}", photoId, viewerId);
+            throw new PhotoNotFoundException(photoId);
+        }
         return new Download(storageService.get(entity.getStorageKey()), entity.getContentType(), entity.getByteSize());
+    }
+
+    private boolean maySee(UUID viewerId, PhotoEntity photo) {
+        UUID ownerId = photo.getUserId();
+        if (ownerId.equals(viewerId)) {
+            return true;
+        }
+        if (!visibilityService.canSeeCollection(viewerId, ownerId)) {
+            return false;
+        }
+        // The copy's own answer still applies. A picture of a copy hidden one by one is
+        // hidden with it, or hiding a record would leave its sleeve reachable by URL.
+        return copyRepository
+                .findById(photo.getCopyId())
+                .filter(copy -> copy.getUserId().equals(ownerId))
+                .filter(copy -> copy.getDeletedAt() == null)
+                .filter(copy -> !copy.isHidden())
+                .isPresent();
     }
 
     public record Download(GetObjectResponse stream, String contentType, long byteSize) {}

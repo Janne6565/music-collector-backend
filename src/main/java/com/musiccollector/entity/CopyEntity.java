@@ -86,6 +86,13 @@ public class CopyEntity {
     @Column(name = "created_at", nullable = false)
     private Long createdAt;
 
+    /**
+     * Withheld from anyone but the owner, whatever the sharing settings say. Mergeable
+     * like every other field on a copy: hiding one on the phone has to reach the laptop.
+     */
+    @Column(nullable = false)
+    private boolean hidden;
+
     @Column(name = "deleted_at")
     private Long deletedAt;
 

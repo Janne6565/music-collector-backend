@@ -30,7 +30,10 @@ public class PhotoController implements PhotoApi {
 
     @Override
     public ResponseEntity<Resource> content(UUID id) {
-        PhotoService.Download download = photoService.download(currentUser.require().getId(), id);
+        // Optional, not required: this endpoint is open so that a public shelf renders for
+        // somebody with no account. Who the viewer is decides what they get, not whether
+        // they get in.
+        PhotoService.Download download = photoService.download(currentUser.optionalId().orElse(null), id);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(download.contentType()))
                 .contentLength(download.byteSize())

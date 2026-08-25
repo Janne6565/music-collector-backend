@@ -56,6 +56,14 @@ public record SyncCopyDto(
         /** The other version of the notes this record knows about; derived by the merge. */
         String notesConflict,
         Integer rating,
+        /**
+         * Withheld from everybody but the owner, whatever the sharing settings say.
+         *
+         * Mergeable like every other field on a copy — hiding a record on the phone has to
+         * reach the laptop. Null on the wire means a client older than the field, which
+         * reads as not hidden.
+         */
+        Boolean hidden,
         Long createdAt,
         Long deletedAt,
         /** Encoded HLC per mergeable field: {@code wall:counter:node}, fixed width. */

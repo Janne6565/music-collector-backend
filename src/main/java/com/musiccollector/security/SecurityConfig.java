@@ -32,6 +32,16 @@ public class SecurityConfig {
             "/api/v1/auth/reset-password",
             "/api/v1/auth/providers",
             "/api/v1/auth/oauth/**",
+            // Profiles are open for the same reason the metadata proxy is: a public shelf
+            // that demands a login to read is not public, and somebody handed a handle
+            // should be able to look before deciding the app is worth an account. Every
+            // endpoint behind this still answers according to who the viewer turns out to
+            // be -- open is not the same as unguarded.
+            "/api/v1/profiles/**",
+            // The bytes of a picture on a shelf somebody is allowed to see. Authorised per
+            // request inside PhotoService against the owner's sharing settings, which a
+            // path rule cannot express.
+            "/api/v1/photos/*/content",
             "/actuator/health/**",
             "/actuator/prometheus",
             "/v3/api-docs/**",

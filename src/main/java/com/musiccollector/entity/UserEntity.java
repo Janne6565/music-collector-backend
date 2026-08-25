@@ -37,6 +37,14 @@ public class UserEntity {
     private String displayName;
 
     /**
+     * The public identifier other collectors search for. Null until Friends is opened for
+     * the first time -- the rest of the app never needs one, so claiming it is not part of
+     * signing up.
+     */
+    @Column
+    private String handle;
+
+    /**
      * Bumped to revoke every outstanding refresh token for this user at once. A refresh
      * token carrying an older version is rejected, so "sign out everywhere" is one write.
      */

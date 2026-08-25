@@ -64,6 +64,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -106,6 +107,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       }
@@ -131,6 +133,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -150,6 +153,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -172,6 +176,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -191,6 +196,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -213,6 +219,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -232,6 +239,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       }
@@ -257,6 +265,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -276,6 +285,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -298,6 +308,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -317,6 +328,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -339,6 +351,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -358,6 +371,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       }
@@ -383,6 +397,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": 5000,
         "fieldClocks": {
@@ -402,6 +417,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000005000:0000:a"
         }
       },
@@ -443,6 +459,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000009000:0000:b",
+          "hidden": null,
           "deletedAt": "000000000009000:0000:b"
         }
       },
@@ -484,6 +501,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000009000:0000:b",
+          "hidden": null,
           "deletedAt": "000000000009000:0000:b"
         }
       }
@@ -509,6 +527,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 7000,
         "deletedAt": null,
         "fieldClocks": {
@@ -528,6 +547,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -550,6 +570,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 3000,
         "deletedAt": null,
         "fieldClocks": {
@@ -569,6 +590,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -591,6 +613,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 3000,
         "deletedAt": null,
         "fieldClocks": {
@@ -610,6 +633,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       }
@@ -635,6 +659,7 @@
         "notes": "Sleeve is sharp, no seam splits.",
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -654,6 +679,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000004000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -676,6 +702,7 @@
         "notes": "Plays clean after a wash.",
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -695,6 +722,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000006000:0000:b",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -717,6 +745,7 @@
         "notes": "Plays clean after a wash.",
         "notesConflict": "Sleeve is sharp, no seam splits.",
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -736,6 +765,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000006000:0000:b",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       }
@@ -761,6 +791,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -780,6 +811,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -802,6 +834,7 @@
         "notes": "Bought at the Sunday market.",
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -821,6 +854,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000006000:0000:b",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -843,6 +877,7 @@
         "notes": "Bought at the Sunday market.",
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -862,6 +897,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000006000:0000:b",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       }
@@ -887,6 +923,7 @@
         "notes": "Gatefold.",
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -906,6 +943,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000004000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -928,6 +966,7 @@
         "notes": "Gatefold.",
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -947,6 +986,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000006000:0000:b",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -969,6 +1009,7 @@
         "notes": "Gatefold.",
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -988,6 +1029,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000006000:0000:b",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       }
@@ -1032,6 +1074,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -1073,6 +1116,7 @@
           "purchasedAt": "000000000001000:0000:b",
           "notes": "000000000001000:0000:b",
           "rating": "000000000001000:0000:b",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:b"
         }
       },
@@ -1114,6 +1158,7 @@
           "purchasedAt": "000000000001000:0000:b",
           "notes": "000000000001000:0000:b",
           "rating": "000000000001000:0000:b",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:b"
         }
       }
@@ -1139,6 +1184,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1158,6 +1204,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -1180,6 +1227,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1199,6 +1247,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -1221,6 +1270,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1240,6 +1290,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       }
@@ -1265,6 +1316,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1284,6 +1336,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -1306,6 +1359,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1325,6 +1379,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -1347,6 +1402,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1366,6 +1422,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       }
@@ -1391,6 +1448,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1410,6 +1468,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -1432,6 +1491,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1451,6 +1511,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       },
@@ -1473,6 +1534,7 @@
         "notes": null,
         "notesConflict": null,
         "rating": null,
+        "hidden": null,
         "createdAt": 1000,
         "deletedAt": null,
         "fieldClocks": {
@@ -1492,6 +1554,7 @@
           "purchasedAt": "000000000001000:0000:a",
           "notes": "000000000001000:0000:a",
           "rating": "000000000001000:0000:a",
+          "hidden": null,
           "deletedAt": "000000000001000:0000:a"
         }
       }

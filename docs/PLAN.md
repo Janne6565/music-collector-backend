@@ -207,3 +207,61 @@ otherwise mark every row of a foreign file Other.
 - `1c` and `1j` are alternates for the same screen. Build `1j`'s full-bleed dark layout —
   turn 3 explicitly evolves it — but keep `1c`'s "other copies you own" block, which `1j`
   drops and the data model needs.
+
+## Friends (turn 15)
+
+A handle, mutual friendship, one Friends tab holding activity and people, and per-list
+visibility. Screens `15a`–`15i`. Built in three phases: identity and the graph, then the
+activity feed, then the public link.
+
+### Why any of it is server-side
+
+The collection stays local-first, but a shelf somebody else looks at cannot be. The
+viewer's device has no copy of the owner's library and must never be handed one it is not
+allowed to see, so `/api/v1/profiles/**` reads the server's own rows and applies the rules
+there. This is the first read path in the app that is not the owner's own data.
+
+### Decisions
+
+| Question | Decision |
+|---|---|
+| Handle vs. name | Separate. The handle is public and searched; the display name never is |
+| Search | Prefix on the **handle only**, 3 characters minimum, 20 results, per-IP quota |
+| Who may search | Anybody, signed in or not — a public shelf that demands a login is not public |
+| Befriending | Needs an account and a handle of your own |
+| Friendship | Mutual, one row, only the addressee may accept |
+| Declining | Deletes the row, so the other person can ask again |
+| Visibility | Three separate answers: collection, wishlist, prices |
+| "Findable" | Unlisted, not private — a direct link still resolves under the visibility rules |
+| Per-copy | `copies.hidden`, a mergeable field, overrides every setting above |
+| Grades | Friends and up. A public page is sleeves, not condition reports |
+| Feed timestamps | The device's own UTC, trusted, clamped so it can never be in the future |
+| Feed contents | Only `MANUAL` adds. Imports and the first sign-in push are silent |
+
+`VisibilityService` is the single authority: every screen, endpoint and image byte asks it
+rather than comparing settings itself. The verdicts are computed live and never stamped
+onto a row, which is what makes closing a shelf take effect backwards as well as forwards —
+including on activity already in somebody's feed.
+
+Photos are the same rule applied to bytes. `GET /api/v1/photos/{id}/content` was
+authenticated-only and is now open, authorising per request: the owner always, a friend
+when the shelf is open to friends, a signed-out stranger only when the collection is
+public — and never for a copy hidden one by one. Every refusal is a 404, so the endpoint
+cannot be used to confirm which photo ids exist.
+
+### Handles
+
+Letters, numbers and single dots, 3–30, anchored at both ends by an alphanumeric. Stored
+lowercased and compared case-insensitively: `@Anna` next to an existing `@anna` would be a
+convincing impersonation of it. Changes are capped at twice a year, counted from
+`handle_changes` rather than a counter; re-saving the handle you already hold is free.
+A released handle stays out of circulation for 180 days so the next claimant does not
+inherit links and pending requests meant for whoever had it before. Reserved words cover
+the app's own path segments — the public profile lives at `/@handle` and its wishlist at
+`/@handle/wishlist`, so a collector called `@wishlist` would shadow a route.
+
+### What the design draws that the data could not
+
+`15b` matches **Friedhelm Barg `@fbarg`** against the query `frie`, which is a match on his
+name rather than his handle. Handle-only search is the deliberate choice — a handle is
+picked to be found by, a real name is not — so the mock data is what gives, not the rule.

@@ -45,6 +45,7 @@ public final class CopyMerge {
             "purchasedAt",
             "notes",
             "rating",
+            "hidden",
             "deletedAt");
 
     private CopyMerge() {}
@@ -97,6 +98,7 @@ public final class CopyMerge {
                 winningNotes,
                 losingNotes(local, remote, winningNotes),
                 (Integer) values.get("rating"),
+                (Boolean) values.get("hidden"),
                 // The same record cannot have been created twice, so the earlier timestamp
                 // is the true one.
                 Math.min(local.createdAt(), remote.createdAt()),
@@ -169,6 +171,7 @@ public final class CopyMerge {
             case "purchasedAt" -> copy.purchasedAt();
             case "notes" -> copy.notes();
             case "rating" -> copy.rating();
+            case "hidden" -> copy.hidden();
             case "deletedAt" -> copy.deletedAt();
             default -> throw new IllegalArgumentException("Not a mergeable field: " + field);
         };

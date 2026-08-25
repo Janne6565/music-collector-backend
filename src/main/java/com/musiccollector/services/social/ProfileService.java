@@ -1,0 +1,294 @@
+package com.musiccollector.services.social;
+
+import com.musiccollector.entity.CopyEntity;
+import com.musiccollector.entity.FriendshipEntity;
+import com.musiccollector.entity.ReleaseEntity;
+import com.musiccollector.entity.UserEntity;
+import com.musiccollector.entity.WishlistItemEntity;
+import com.musiccollector.model.core.Format;
+import com.musiccollector.model.core.FriendRequestDto;
+import com.musiccollector.model.core.FriendsOverviewDto;
+import com.musiccollector.model.core.ProfileDto;
+import com.musiccollector.model.core.ProfileSummaryDto;
+import com.musiccollector.model.core.RelationshipDto;
+import com.musiccollector.model.core.ReleaseDto;
+import com.musiccollector.model.core.SharedCollectionDto;
+import com.musiccollector.model.core.SharedCopyDto;
+import com.musiccollector.model.core.SharedWishDto;
+import com.musiccollector.model.core.SharedWishlistDto;
+import com.musiccollector.model.exception.ProfileNotFoundException;
+import com.musiccollector.model.exception.ProfileNotVisibleException;
+import com.musiccollector.repository.CopyRepository;
+import com.musiccollector.repository.ReleaseRepository;
+import com.musiccollector.repository.UserRepository;
+import com.musiccollector.repository.WishlistItemRepository;
+import com.musiccollector.services.metadata.MetadataMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Somebody else's shelf, assembled for one particular viewer.
+ *
+ * <p>Every list this service returns has already had {@link VisibilityService} applied to
+ * it. Nothing here trusts a flag the client sent, and nothing returns a field the viewer
+ * has not earned — a copy the viewer may not price comes back with a null price rather than
+ * a price the UI is asked politely not to draw.
+ */
+@Service
+@RequiredArgsConstructor
+public class ProfileService {
+
+    /** Shortest prefix the handle autocomplete will act on. */
+    private static final int MIN_QUERY_LENGTH = 3;
+
+    private static final int SEARCH_LIMIT = 20;
+
+    /**
+     * How much of one shelf comes back at once. Generous enough that the format counts the
+     * client derives under the grid are right for any real collection, and the response
+     * says when it was not.
+     */
+    private static final int LIST_LIMIT = 1000;
+
+    private final UserRepository userRepository;
+    private final CopyRepository copyRepository;
+    private final WishlistItemRepository wishlistItemRepository;
+    private final ReleaseRepository releaseRepository;
+    private final FriendshipService friendshipService;
+    private final VisibilityService visibilityService;
+
+    /**
+     * Handle autocomplete.
+     *
+     * <p>Open to signed-out visitors on purpose — someone handed a handle should be able to
+     * look at the shelf before deciding whether the app is worth an account. What keeps it
+     * from being a directory is the shape of the query, not a login: three characters
+     * minimum, prefix only, twenty results, and only over people who have not opted out.
+     */
+    @Transactional(readOnly = true)
+    public List<ProfileSummaryDto> search(UUID viewerId, String query) {
+        String prefix = normalise(query);
+        if (prefix.length() < MIN_QUERY_LENGTH) {
+            return List.of();
+        }
+        List<UserEntity> found =
+                userRepository.searchByHandlePrefix(escapeLike(prefix), PageRequest.of(0, SEARCH_LIMIT));
+        return found.stream().map(user -> summaryOf(viewerId, user)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ProfileDto profile(UUID viewerId, String handle) {
+        UserEntity owner = require(handle);
+        boolean collection = visibilityService.canSeeCollection(viewerId, owner.getId());
+        return new ProfileDto(
+                owner.getId(),
+                owner.getHandle(),
+                owner.getDisplayName(),
+                friendshipService.relationship(viewerId, owner.getId()),
+                collection,
+                visibilityService.canSeeWishlist(viewerId, owner.getId()),
+                visibilityService.canSeePrices(viewerId, owner.getId()),
+                // Said out loud even behind a lock: 15d's whole invitation is the number.
+                copyRepository.countVisible(owner.getId()),
+                wishlistItemRepository.countVisible(owner.getId()),
+                owner.getCreatedAt());
+    }
+
+    @Transactional(readOnly = true)
+    public SharedCollectionDto collection(UUID viewerId, String handle) {
+        UserEntity owner = require(handle);
+        if (!visibilityService.canSeeCollection(viewerId, owner.getId())) {
+            throw new ProfileNotVisibleException(owner.getHandle());
+        }
+        boolean prices = visibilityService.canSeePrices(viewerId, owner.getId());
+        boolean grades = visibilityService.canSeeGrades(viewerId, owner.getId());
+
+        List<CopyEntity> copies = copyRepository.findVisible(owner.getId(), PageRequest.of(0, LIST_LIMIT + 1));
+        boolean truncated = copies.size() > LIST_LIMIT;
+        List<CopyEntity> shown = truncated ? copies.subList(0, LIST_LIMIT) : copies;
+
+        Map<String, ReleaseDto> releases = resolve(shown);
+        List<SharedCopyDto> dtos = new ArrayList<>(shown.size());
+        for (CopyEntity copy : shown) {
+            dtos.add(toDto(copy, releases.get(copy.getReleaseId()), prices, grades));
+        }
+        return new SharedCollectionDto(dtos, copyRepository.countVisible(owner.getId()), truncated);
+    }
+
+    @Transactional(readOnly = true)
+    public SharedWishlistDto wishlist(UUID viewerId, String handle) {
+        UserEntity owner = require(handle);
+        if (!visibilityService.canSeeWishlist(viewerId, owner.getId())) {
+            throw new ProfileNotVisibleException(owner.getHandle());
+        }
+        List<WishlistItemEntity> wishes =
+                wishlistItemRepository.findVisible(owner.getId(), PageRequest.of(0, LIST_LIMIT + 1));
+        boolean truncated = wishes.size() > LIST_LIMIT;
+        List<WishlistItemEntity> shown = truncated ? wishes.subList(0, LIST_LIMIT) : wishes;
+
+        List<SharedWishDto> dtos = shown.stream()
+                .map(wish -> new SharedWishDto(
+                        wish.getId().toString(),
+                        wish.getAlbumId(),
+                        wish.getTitle(),
+                        wish.getArtistName(),
+                        wish.getYear(),
+                        wish.getDesiredFormat(),
+                        wish.getCreatedAt()))
+                .toList();
+        return new SharedWishlistDto(dtos, wishlistItemRepository.countVisible(owner.getId()), truncated);
+    }
+
+    /** People, requests and outgoing asks in one response — the whole People panel of 15b. */
+    @Transactional(readOnly = true)
+    public FriendsOverviewDto friendsOverview(UUID viewerId) {
+        List<UUID> friendIds = friendshipService.friendIds(viewerId);
+        Map<UUID, UserEntity> people = byId(friendIds);
+
+        List<ProfileSummaryDto> friends = friendIds.stream()
+                .map(people::get)
+                .filter(user -> user != null)
+                .map(user -> summaryOf(viewerId, user))
+                .toList();
+
+        List<FriendRequestDto> incoming = new ArrayList<>();
+        for (FriendshipEntity request : friendshipService.incoming(viewerId)) {
+            userRepository.findById(request.getRequesterId()).ifPresent(from -> incoming.add(new FriendRequestDto(
+                    request.getId(),
+                    summaryOf(viewerId, from),
+                    request.getCreatedAt(),
+                    friendshipService.mutualFriendCount(viewerId, from.getId()))));
+        }
+
+        List<ProfileSummaryDto> outgoing = friendshipService.outgoing(viewerId).stream()
+                .map(request -> userRepository.findById(request.getAddresseeId()).orElse(null))
+                .filter(user -> user != null)
+                .map(user -> summaryOf(viewerId, user))
+                .toList();
+
+        return new FriendsOverviewDto(friends, incoming, outgoing);
+    }
+
+    /**
+     * One person in a list.
+     *
+     * <p>The copy count is withheld when the shelf is closed to this viewer. "312 copies"
+     * under a locked profile is a fact about a collection somebody chose not to show, and a
+     * search result is not the place to leak it — the profile screen names a total only
+     * because the design deliberately makes that the invitation to ask.
+     */
+    private ProfileSummaryDto summaryOf(UUID viewerId, UserEntity user) {
+        boolean visible = visibilityService.canSeeCollection(viewerId, user.getId());
+        return new ProfileSummaryDto(
+                user.getId(),
+                user.getHandle(),
+                user.getDisplayName(),
+                visible ? copyRepository.countVisible(user.getId()) : null,
+                friendshipService.relationship(viewerId, user.getId()),
+                !visible);
+    }
+
+    /**
+     * The release behind each copy.
+     *
+     * <p>Copies typed in by hand carry their own release facts and point at
+     * {@code local:<their own id>}, which is in no mirror and never will be, so they are
+     * derived here rather than looked up.
+     */
+    private Map<String, ReleaseDto> resolve(List<CopyEntity> copies) {
+        List<String> ids = copies.stream()
+                .map(CopyEntity::getReleaseId)
+                .filter(id -> id != null && !id.startsWith("local:"))
+                .distinct()
+                .toList();
+        Map<String, ReleaseDto> byId = new HashMap<>();
+        if (!ids.isEmpty()) {
+            for (ReleaseEntity release : releaseRepository.findAllByExternalIdIn(ids)) {
+                byId.put(release.getExternalId(), MetadataMapper.toDto(release, null));
+            }
+        }
+        return byId;
+    }
+
+    private SharedCopyDto toDto(CopyEntity copy, ReleaseDto release, boolean prices, boolean grades) {
+        String title = firstNonBlank(copy.getManualTitle(), release == null ? null : release.title(), "Untitled");
+        String artist =
+                firstNonBlank(copy.getManualArtist(), release == null ? null : release.artistName(), "Unknown artist");
+        Integer year = copy.getManualYear() != null ? copy.getManualYear() : release == null ? null : release.year();
+        return new SharedCopyDto(
+                copy.getId().toString(),
+                copy.getReleaseId(),
+                title,
+                artist,
+                year,
+                format(copy, release),
+                release == null ? null : release.coverArtUrl(),
+                release == null ? null : release.coverTheme(),
+                grades ? copy.getCondition() : null,
+                grades ? copy.getSleeveCondition() : null,
+                prices ? copy.getPricePaidCents() : null,
+                prices ? copy.getCurrency() : null,
+                copy.getCreatedAt());
+    }
+
+    /** The copy's own answer first, exactly as {@code copyFormat} does on the clients. */
+    private Format format(CopyEntity copy, ReleaseDto release) {
+        if (copy.getManualFormat() != null && !copy.getManualFormat().isBlank()) {
+            try {
+                return Format.valueOf(copy.getManualFormat().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                return Format.OTHER;
+            }
+        }
+        return release == null ? Format.OTHER : release.format();
+    }
+
+    private UserEntity require(String handle) {
+        String normalised = normalise(handle);
+        return userRepository
+                .findByHandleIgnoreCase(normalised)
+                .orElseThrow(() -> new ProfileNotFoundException(normalised));
+    }
+
+    private Map<UUID, UserEntity> byId(List<UUID> ids) {
+        Map<UUID, UserEntity> people = new HashMap<>();
+        if (ids.isEmpty()) {
+            return people;
+        }
+        for (UserEntity user : userRepository.findAllByIdIn(ids)) {
+            people.put(user.getId(), user);
+        }
+        return people;
+    }
+
+    private static String normalise(String raw) {
+        String trimmed = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+        return trimmed.startsWith("@") ? trimmed.substring(1) : trimmed;
+    }
+
+    /**
+     * A prefix is user input going into a LIKE pattern. Without this, typing a percent sign
+     * would match every handle on the platform in one query.
+     */
+    private static String escapeLike(String prefix) {
+        return prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
+    private static String firstNonBlank(String... candidates) {
+        for (String candidate : candidates) {
+            if (candidate != null && !candidate.isBlank()) {
+                return candidate;
+            }
+        }
+        return "";
+    }
+}
