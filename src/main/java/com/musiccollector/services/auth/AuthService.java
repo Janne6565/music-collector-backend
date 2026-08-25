@@ -115,6 +115,23 @@ public class AuthService {
     }
 
     /**
+     * Renames the account.
+     *
+     * No token is touched: the name is not part of what a token proves, and the access
+     * token the client already holds stays valid, so a rename does not interrupt a sync.
+     * Blank means "no name" -- the same null the account had before it was ever given one.
+     */
+    @Transactional
+    public UserDto updateProfile(UserEntity user, String displayName) {
+        String trimmed = displayName == null ? null : displayName.trim();
+        user.setDisplayName(trimmed == null || trimmed.isEmpty() ? null : trimmed);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+        log.debug("Renamed user {}", user.getId());
+        return toDto(user);
+    }
+
+    /**
      * Deletes the account and everything the server holds for it.
      *
      * The photo objects are removed first: the rows go with the user by cascade, and once

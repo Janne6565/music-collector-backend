@@ -4,6 +4,7 @@ import com.musiccollector.model.action.ForgotPasswordRequest;
 import com.musiccollector.model.action.LoginRequest;
 import com.musiccollector.model.action.RegisterRequest;
 import com.musiccollector.model.action.ResetPasswordRequest;
+import com.musiccollector.model.action.UpdateProfileRequest;
 import com.musiccollector.model.core.SessionDto;
 import com.musiccollector.model.core.UserDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 
 /**
  * Accounts, which are entirely optional.
@@ -87,6 +89,15 @@ public interface AuthApi {
     @ApiResponse(responseCode = "200", description = "The account")
     @ApiResponse(responseCode = "401", description = "Not signed in")
     ResponseEntity<UserDto> me();
+
+    @PatchMapping("/me")
+    @Operation(
+            summary = "Change the account's display name",
+            description = "The name the app greets you by and the one friends see. "
+                    + "A blank name clears it; the e-mail then stands in for it as before.")
+    @ApiResponse(responseCode = "200", description = "The account, as it now reads")
+    @ApiResponse(responseCode = "401", description = "Not signed in")
+    ResponseEntity<UserDto> updateProfile(@Valid @RequestBody UpdateProfileRequest request);
 
     @DeleteMapping("/me")
     @Operation(

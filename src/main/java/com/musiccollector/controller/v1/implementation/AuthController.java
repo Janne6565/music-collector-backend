@@ -5,6 +5,7 @@ import com.musiccollector.model.action.ForgotPasswordRequest;
 import com.musiccollector.model.action.LoginRequest;
 import com.musiccollector.model.action.RegisterRequest;
 import com.musiccollector.model.action.ResetPasswordRequest;
+import com.musiccollector.model.action.UpdateProfileRequest;
 import com.musiccollector.model.core.SessionDto;
 import com.musiccollector.model.core.TokenMode;
 import com.musiccollector.model.core.UserDto;
@@ -71,6 +72,11 @@ public class AuthController implements AuthApi {
     @Override
     public ResponseEntity<UserDto> me() {
         return ResponseEntity.ok(AuthService.toDto(currentUser.require()));
+    }
+
+    @Override
+    public ResponseEntity<UserDto> updateProfile(UpdateProfileRequest request) {
+        return ResponseEntity.ok(authService.updateProfile(currentUser.require(), request.displayName()));
     }
 
     @Override
