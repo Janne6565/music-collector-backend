@@ -22,6 +22,20 @@ public record SyncCopyDto(
          * client of that vintage is left.
          */
         @JsonAlias("releaseMbid") String releaseId,
+        /**
+         * The pressing, as it was typed in, when {@code releaseId} is
+         * {@code local:<this copy's id>} and no catalogue has the record.
+         *
+         * Six mergeable fields rather than one object: correcting the year on one device
+         * and the label on another has to keep both. Null throughout on a copy matched to
+         * a real release, and null from any client older than the fields.
+         */
+        String manualTitle,
+        String manualArtist,
+        Integer manualYear,
+        String manualLabel,
+        String manualCatalogNumber,
+        String manualFormat,
         /** The media grade, on the Goldmine scale. */
         String condition,
         /** The sleeve grade, graded separately from the media. */

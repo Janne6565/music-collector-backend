@@ -30,6 +30,12 @@ public final class CopyMerge {
      */
     public static final List<String> MERGEABLE_FIELDS = List.of(
             "releaseId",
+            "manualTitle",
+            "manualArtist",
+            "manualYear",
+            "manualLabel",
+            "manualCatalogNumber",
+            "manualFormat",
             "condition",
             "sleeveCondition",
             "catalogArt",
@@ -75,6 +81,12 @@ public final class CopyMerge {
         return new SyncCopyDto(
                 local.id(),
                 (String) values.get("releaseId"),
+                (String) values.get("manualTitle"),
+                (String) values.get("manualArtist"),
+                (Integer) values.get("manualYear"),
+                (String) values.get("manualLabel"),
+                (String) values.get("manualCatalogNumber"),
+                (String) values.get("manualFormat"),
                 (String) values.get("condition"),
                 (String) values.get("sleeveCondition"),
                 (String) values.get("catalogArt"),
@@ -142,6 +154,12 @@ public final class CopyMerge {
     private static Object valueOf(SyncCopyDto copy, String field) {
         return switch (field) {
             case "releaseId" -> copy.releaseId();
+            case "manualTitle" -> copy.manualTitle();
+            case "manualArtist" -> copy.manualArtist();
+            case "manualYear" -> copy.manualYear();
+            case "manualLabel" -> copy.manualLabel();
+            case "manualCatalogNumber" -> copy.manualCatalogNumber();
+            case "manualFormat" -> copy.manualFormat();
             case "condition" -> copy.condition();
             case "sleeveCondition" -> copy.sleeveCondition();
             case "catalogArt" -> copy.catalogArt();

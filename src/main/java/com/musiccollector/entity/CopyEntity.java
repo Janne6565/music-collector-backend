@@ -28,6 +28,31 @@ public class CopyEntity {
     @Column(name = "release_id", nullable = false)
     private String releaseId;
 
+    /**
+     * What a hand-entered copy says about its own pressing, all null on a matched one.
+     *
+     * On the copy rather than in the `releases` mirror because they are the user's data:
+     * the mirror is a shared cache of two catalogues, keyed by their ids, and a pressing
+     * only one person has ever seen has no place in it.
+     */
+    @Column(name = "manual_title")
+    private String manualTitle;
+
+    @Column(name = "manual_artist")
+    private String manualArtist;
+
+    @Column(name = "manual_year")
+    private Integer manualYear;
+
+    @Column(name = "manual_label")
+    private String manualLabel;
+
+    @Column(name = "manual_catalog_number")
+    private String manualCatalogNumber;
+
+    @Column(name = "manual_format")
+    private String manualFormat;
+
     /** The media grade. Kept as `condition` because it is the field that already synced. */
     @Column(name = "condition")
     private String condition;

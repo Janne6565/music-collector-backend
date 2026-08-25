@@ -114,7 +114,17 @@ class CopyMergeTest {
 
     private static SyncCopyDto withId(SyncCopyDto copy, String id) {
         return new SyncCopyDto(
-                id, copy.releaseId(), copy.condition(), copy.sleeveCondition(), copy.catalogArt(),
+                id,
+                copy.releaseId(),
+                copy.manualTitle(),
+                copy.manualArtist(),
+                copy.manualYear(),
+                copy.manualLabel(),
+                copy.manualCatalogNumber(),
+                copy.manualFormat(),
+                copy.condition(),
+                copy.sleeveCondition(),
+                copy.catalogArt(),
                 copy.pricePaidCents(),
                 copy.currency(),
                 copy.purchasedOn(), copy.purchasedAt(), copy.notes(), copy.notesConflict(), copy.rating(),

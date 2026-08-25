@@ -296,6 +296,12 @@ public class SyncService {
 
     private void apply(CopyEntity entity, SyncCopyDto dto) {
         entity.setReleaseId(dto.releaseId());
+        entity.setManualTitle(dto.manualTitle());
+        entity.setManualArtist(dto.manualArtist());
+        entity.setManualYear(dto.manualYear());
+        entity.setManualLabel(dto.manualLabel());
+        entity.setManualCatalogNumber(dto.manualCatalogNumber());
+        entity.setManualFormat(dto.manualFormat());
         entity.setCondition(dto.condition());
         entity.setSleeveCondition(dto.sleeveCondition());
         // Absent means a client older than the field, which is the same as having said nothing.
@@ -316,6 +322,12 @@ public class SyncService {
         return new SyncCopyDto(
                 entity.getId().toString(),
                 entity.getReleaseId(),
+                entity.getManualTitle(),
+                entity.getManualArtist(),
+                entity.getManualYear(),
+                entity.getManualLabel(),
+                entity.getManualCatalogNumber(),
+                entity.getManualFormat(),
                 entity.getCondition(),
                 entity.getSleeveCondition(),
                 entity.getCatalogArt(),

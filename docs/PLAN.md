@@ -150,6 +150,33 @@ server while `hasMore` claims the client is up to date.
 Phases 2 and 3 being separable is the main dividend of local-first: sync cannot block the
 app from being useful.
 
+## Manual entry (turn 14)
+
+A copy of a pressing no catalogue has — a bootleg, a test press, a tape somebody made.
+Screens `14a` (mobile) and `14b` (web, the fourth tab of the add sheet).
+
+Its release facts live **on the copy**, as six mergeable fields (`manualTitle`,
+`manualArtist`, `manualYear`, `manualLabel`, `manualCatalogNumber`, `manualFormat`), and
+its `releaseId` is `local:<the copy's own id>`.
+
+Three decisions, each of which the obvious alternative gets wrong:
+
+- **Not in the `releases` mirror.** That table is a shared cache of MusicBrainz and
+  Discogs, keyed by their ids and dropped freely; a pressing only one person has ever seen
+  is user data that has to sync and has to survive the cache being cleared.
+- **Six fields, not one blob.** They merge under their own clocks, so correcting the year
+  on the phone and the label on the laptop keeps both — the same reason every other field
+  on a copy is separate.
+- **The release id is the copy's own id.** A second generated uuid would make it possible
+  to have a manual release nobody owns, or a copy pointing at a release the device has
+  never heard of. With the copy id inside it, any device holding the copy resolves the
+  release; nothing is cached, `manualRelease(copy)` derives it on read.
+
+Both stores resolve `local:` ids through that function rather than the mirror, so every
+screen keeps reading a `Release` and none of them needs a branch. The CSV export already
+carried the human-readable columns; the importer now reads them back, so a hand-entered
+copy survives a round trip instead of being skipped.
+
 ## Design notes carried from the deck
 
 - Tokens: bg `#faf8f5`, dark `#141311`, ink `#191713`, accent `#a2573a` (dark variant
