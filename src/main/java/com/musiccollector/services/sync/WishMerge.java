@@ -18,7 +18,7 @@ import java.util.Objects;
 public final class WishMerge {
 
     public static final List<String> MERGEABLE_FIELDS = List.of(
-            "albumId", "title", "artistName", "year", "desiredFormat", "note", "deletedAt");
+            "albumId", "title", "artistName", "year", "desiredFormat", "note", "sortIndex", "deletedAt");
 
     private WishMerge() {}
 
@@ -56,6 +56,7 @@ public final class WishMerge {
                 (Integer) values.get("year"),
                 (String) values.get("desiredFormat"),
                 (String) values.get("note"),
+                (Integer) values.get("sortIndex"),
                 Math.min(local.createdAt(), remote.createdAt()),
                 (Long) values.get("deletedAt"),
                 clocks);
@@ -84,6 +85,7 @@ public final class WishMerge {
             case "year" -> wish.year();
             case "desiredFormat" -> wish.desiredFormat();
             case "note" -> wish.note();
+            case "sortIndex" -> wish.sortIndex();
             case "deletedAt" -> wish.deletedAt();
             default -> throw new IllegalArgumentException("Not a mergeable field: " + field);
         };

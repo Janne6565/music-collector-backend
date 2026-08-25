@@ -301,3 +301,56 @@ request time rather than fanned out into per-viewer inboxes. That is what makes 
 reach backwards — the lines do not have to be found and deleted from anywhere, they simply
 stop being readable — and it means no settings change has a rewrite job that can fail
 halfway.
+
+## Wishlist (turn 16)
+
+A want list at release level: the format you want, an optional note, and the date it was
+added. No price, no priority, no alerts. Screens `16a`–`16g`; `16h` (wishlist visibility)
+and `16i` (a friend's wishlist) belong to the Friends turn above and are built there.
+
+The table already existed (`V5`), so most of this turn is the rules around it rather than
+new storage. What it does add is one column.
+
+### Decisions
+
+**The hand-built order is synced data, not a device preference.** `wishlist_items.sortIndex`
+(`V21`, nullable, mergeable) is where a dragged row sits; `NULL` means "never placed by
+hand", which is *not* position 0. An entry added since the last drag sorts after the placed
+ones rather than jumping to the top of an order it was never part of. Which *sort* the list
+is showing is the opposite — a per-device preference in the local settings store — because
+the column you happen to be reading a list by is a fact about the screen in front of you,
+while where you dragged a row to is a fact about the list.
+
+**A drag renumbers the whole list densely from 0.** Not a fractional index wedged between
+two neighbours: field-level last-write-wins would resolve competing fractions into an order
+neither person built, whereas a dense renumber resolves into *one* of the two orders, which
+is a thing somebody meant.
+
+**"Any" matches every format on auto-removal.** This was left open by the deck. `Any` is
+what the word promises, and a list that kept an entry you had explicitly marked
+format-agnostic after you filed the record is a list nobody trusts to empty itself. A named
+format matches only itself: wanting *Ege Bamyasi* on vinyl is not satisfied by buying the
+CD, so the entry stands and you keep hunting. The copy's own `manualFormat` wins over the
+catalogue's, through `copyFormat` — the rule lives in `wishSatisfiedBy` in the shared
+package so the two clients cannot disagree about which entries a new copy clears.
+
+**Removal is triggered by the add, not by the store.** Every path that files a copy calls
+`useSatisfyWishes`; the store does not do it on `putCopy`. The store is where records are
+written, not where product decisions live, and a sync pulling somebody else's copy in must
+not silently rewrite this device's wishlist.
+
+**A wish can be for a record no catalogue has.** Its `albumId` is `local:<uuid>`, the same
+prefix a hand-entered copy uses (turn 14). Nothing can look it up, which is exactly right:
+the entry makes no claim about the archive, and it can therefore never be auto-matched.
+
+**Three wanted formats, not five.** `VINYL | CD | CASSETTE | null`. `DIGITAL` and `OTHER`
+are formats a *copy* can be, but nobody hunts for a download — a wishlist is a list you
+keep so you remember at the shop. A wish taken from a release that is neither vinyl, CD nor
+tape becomes "any" (`asWishFormat`) rather than an unpickable fourth chip.
+
+**"I found a copy" opens the add flow with the wish's search run, not a fixed pressing.**
+A wish names an album; which pressing you found is still yours to pick. The entry stays on
+the list throughout — backing out of the add flow costs nothing — and leaves only once a
+copy exists, through the same automatic removal as any other add. That is also why there is
+no separate "take it off the wishlist" toggle: the undoable line is the one mechanism, and
+a second one would be a second answer to the same question.

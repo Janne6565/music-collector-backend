@@ -325,6 +325,7 @@ public class SyncService {
         entity.setYear(dto.year());
         entity.setDesiredFormat(dto.desiredFormat());
         entity.setNote(dto.note());
+        entity.setSortIndex(dto.sortIndex());
         entity.setCreatedAt(dto.createdAt());
         entity.setDeletedAt(dto.deletedAt());
         entity.setFieldClocks(writeClocks(dto.fieldClocks()));
@@ -339,6 +340,7 @@ public class SyncService {
                 entity.getYear(),
                 entity.getDesiredFormat(),
                 entity.getNote(),
+                entity.getSortIndex(),
                 entity.getCreatedAt(),
                 entity.getDeletedAt(),
                 readClocks(entity.getFieldClocks()));

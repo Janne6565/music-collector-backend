@@ -17,6 +17,7 @@ public record SyncWishDto(
         Integer year,
         String desiredFormat,
         String note,
+        Integer sortIndex,
         Long createdAt,
         Long deletedAt,
         Map<String, String> fieldClocks) {}

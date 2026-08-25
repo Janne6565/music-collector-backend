@@ -40,6 +40,10 @@ public class WishlistItemEntity {
 
     private String note;
 
+    /** Where the entry sits once the list has been hand-sorted; null while it never has been. */
+    @Column(name = "sort_index")
+    private Integer sortIndex;
+
     @Column(name = "created_at", nullable = false)
     private Long createdAt;
 
