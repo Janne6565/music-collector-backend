@@ -22,18 +22,18 @@ class FormatTest {
         "DAT,OTHER",
     })
     void mapsMusicBrainzMediaFormats(String mediaFormat, Format expected) {
-        assertThat(Format.fromMusicBrainz(mediaFormat)).isEqualTo(expected);
+        assertThat(Format.fromMediumName(mediaFormat)).isEqualTo(expected);
     }
 
     @Test
     void treatsMissingFormatAsOther() {
-        assertThat(Format.fromMusicBrainz(null)).isEqualTo(Format.OTHER);
-        assertThat(Format.fromMusicBrainz("  ")).isEqualTo(Format.OTHER);
+        assertThat(Format.fromMediumName(null)).isEqualTo(Format.OTHER);
+        assertThat(Format.fromMediumName("  ")).isEqualTo(Format.OTHER);
     }
 
     @Test
     void prefersCassetteOverCdWhenBothWordsAppear() {
         // "CD" is checked last precisely so a compound name is not misfiled as a disc.
-        assertThat(Format.fromMusicBrainz("Cassette (CD-sized case)")).isEqualTo(Format.CASSETTE);
+        assertThat(Format.fromMediumName("Cassette (CD-sized case)")).isEqualTo(Format.CASSETTE);
     }
 }

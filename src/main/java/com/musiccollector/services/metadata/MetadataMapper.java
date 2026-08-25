@@ -58,7 +58,7 @@ public final class MetadataMapper {
             return Format.OTHER;
         }
         // A release can span media (a CD+DVD set); the first medium names the edition.
-        return Format.fromMusicBrainz(release.media().getFirst().format());
+        return Format.fromMediumName(release.media().getFirst().format());
     }
 
     /** Discs across every medium — a 2xLP is one release with two of them. */
