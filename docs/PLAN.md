@@ -302,6 +302,28 @@ reach backwards — the lines do not have to be found and deleted from anywhere,
 stop being readable — and it means no settings change has a rewrite job that can fail
 halfway.
 
+### A shared shelf shows the owner's photos
+
+A hand-entered copy points at no catalogue, so it has no cover art and never will --
+its picture is a photograph of the record (turn 14). `SharedCopyDto.previewPhotoId` names
+the copy's first photo, picked by the same rule as `copyPreviewSrc` on the clients: the
+copy's own first photo wins unless it has starred the catalogue artwork instead. It is
+resolved server-side in one query for the whole shelf, because the viewer has none of the
+owner's photos and cannot ask the strip which one is first.
+
+This opens no new door. `/api/v1/photos/{id}/content` was already reachable without a
+session and authorises per request inside `PhotoService` -- owner always, a friend when the
+shelf is open to friends, a stranger only when it is public, and never for a copy hidden
+one by one. What changes is only that a viewer is now *told* which photo to ask for.
+
+Clients fetch those bytes through the API client rather than pointing an `<img>` at the
+URL: a friends-only shelf needs the viewer's token on the request, and an image tag cannot
+send one.
+
+`catalogArt: HIDDEN` is applied on the way out too (`catalogArtShown`). Taking the
+archive's artwork out of a copy's images is a decision about that copy, not about the
+device it was made on, and the shelf was handing the URL over regardless.
+
 ## Wishlist (turn 16)
 
 A want list at release level: the format you want, an optional note, and the date it was
