@@ -3,6 +3,7 @@ package com.musiccollector.services.auth.oauth;
 import com.musiccollector.configuration.OAuthProperties;
 import com.musiccollector.entity.OAuthStateEntity;
 import com.musiccollector.model.core.AuthProviderDto;
+import com.musiccollector.model.core.OAuthClient;
 import com.musiccollector.model.exception.OAuthFailedException;
 import com.musiccollector.repository.OAuthStateRepository;
 import lombok.RequiredArgsConstructor;
@@ -57,7 +58,7 @@ public class OAuthService {
     }
 
     @Transactional
-    public String authorizeUrl(String providerId) {
+    public String authorizeUrl(String providerId, OAuthClient client) {
         OAuthProperties.Provider provider = require(providerId);
 
         byte[] raw = new byte[32];
@@ -67,6 +68,9 @@ public class OAuthService {
         OAuthStateEntity entity = new OAuthStateEntity();
         entity.setState(state);
         entity.setProvider(providerId);
+        // Remembered here because the callback comes from the provider and says nothing
+        // about who started the flow, yet the two clients have to be finished differently.
+        entity.setClient(client);
         entity.setExpiresAt(Instant.now().plus(STATE_LIFETIME));
         entity.setCreatedAt(Instant.now());
         stateRepository.save(entity);
@@ -91,9 +95,12 @@ public class OAuthService {
                 .toUriString();
     }
 
-    /** Consumes the state exactly once; a replayed callback finds it already used. */
+    /**
+     * Consumes the state exactly once and reports which client began the flow; a replayed
+     * callback finds it already used.
+     */
     @Transactional
-    public void consumeState(String providerId, String state) {
+    public OAuthClient consumeState(String providerId, String state) {
         OAuthStateEntity entity = stateRepository
                 .findById(state == null ? "" : state)
                 .filter(candidate -> candidate.getUsedAt() == null)
@@ -102,6 +109,29 @@ public class OAuthService {
                 .orElseThrow(() -> new OAuthFailedException("That sign-in attempt is no longer valid."));
         entity.setUsedAt(Instant.now());
         stateRepository.save(entity);
+        return entity.getClient() == null ? OAuthClient.WEB : entity.getClient();
+    }
+
+    /**
+     * Which client started this flow, without consuming the state.
+     *
+     * <p>Only for the failure paths: a person who cancels at the provider should land back
+     * in the app they started from, and there is no code to exchange there anyway. An
+     * unknown or already-used state means nothing better than a guess is available, and
+     * the web app is the safe guess — it can render an error, whereas a bogus deep link
+     * would do nothing at all.
+     */
+    @Transactional(readOnly = true)
+    public OAuthClient clientFor(String state) {
+        return stateRepository
+                .findById(state == null ? "" : state)
+                .map(OAuthStateEntity::getClient)
+                .orElse(OAuthClient.WEB);
+    }
+
+    /** Where the callback reopens a native app once the sign-in is finished. */
+    public String mobileRedirectUri() {
+        return properties.safeMobileRedirectUri();
     }
 
     /** Exchanges the code for the provider's view of who just signed in. */

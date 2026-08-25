@@ -2,6 +2,7 @@ package com.musiccollector.services.auth.oauth;
 
 import com.musiccollector.configuration.OAuthProperties;
 import com.musiccollector.entity.OAuthStateEntity;
+import com.musiccollector.model.core.OAuthClient;
 import com.musiccollector.model.exception.OAuthFailedException;
 import com.musiccollector.repository.OAuthStateRepository;
 import org.junit.jupiter.api.Test;
@@ -44,21 +45,22 @@ class OAuthServiceTest {
 
     private OAuthService service(Map<String, OAuthProperties.Provider> providers) {
         return new OAuthService(
-                new OAuthProperties("https://music.example", providers), stateRepository);
+                new OAuthProperties("https://music.example", "musiccollector://auth/callback", providers),
+                stateRepository);
     }
 
     @Test
     void asksAppleToPostTheCallbackBack() {
         // Apple rejects the request outright if name or e-mail scope is asked for without
         // this, so its absence would break every Apple sign-in on the first attempt.
-        String url = service(Map.of("apple", applePostsBack())).authorizeUrl("apple");
+        String url = service(Map.of("apple", applePostsBack())).authorizeUrl("apple", OAuthClient.WEB);
 
         assertThat(url).contains("response_mode=form_post");
     }
 
     @Test
     void leavesResponseModeOffForProvidersThatRedirectNormally() {
-        String url = service(Map.of("google", configured())).authorizeUrl("google");
+        String url = service(Map.of("google", configured())).authorizeUrl("google", OAuthClient.WEB);
 
         assertThat(url).doesNotContain("response_mode");
     }
@@ -76,21 +78,23 @@ class OAuthServiceTest {
     void refusesToStartAFlowForAnUnconfiguredProvider() {
         var service = service(Map.of("apple", unconfigured()));
 
-        assertThatThrownBy(() -> service.authorizeUrl("apple")).isInstanceOf(OAuthFailedException.class);
+        assertThatThrownBy(() -> service.authorizeUrl("apple", OAuthClient.WEB))
+                .isInstanceOf(OAuthFailedException.class);
     }
 
     @Test
     void refusesAProviderItHasNeverHeardOf() {
         var service = service(Map.of("google", configured()));
 
-        assertThatThrownBy(() -> service.authorizeUrl("myspace")).isInstanceOf(OAuthFailedException.class);
+        assertThatThrownBy(() -> service.authorizeUrl("myspace", OAuthClient.WEB))
+                .isInstanceOf(OAuthFailedException.class);
     }
 
     @Test
     void buildsAnAuthorizeUrlCarryingAFreshState() {
         when(stateRepository.save(any())).thenAnswer(call -> call.getArgument(0));
 
-        String url = service(Map.of("google", configured())).authorizeUrl("google");
+        String url = service(Map.of("google", configured())).authorizeUrl("google", OAuthClient.WEB);
 
         assertThat(url).startsWith("https://accounts.example/authorize");
         assertThat(url).contains("client_id=client-id");
@@ -105,7 +109,7 @@ class OAuthServiceTest {
         // URI.create throw on the very first sign-in with any real provider.
         when(stateRepository.save(any())).thenAnswer(call -> call.getArgument(0));
 
-        String url = service(Map.of("google", configured())).authorizeUrl("google");
+        String url = service(Map.of("google", configured())).authorizeUrl("google", OAuthClient.WEB);
 
         assertThat(url).doesNotContain(" ");
         assertThat(url).contains("scope=openid%20email");
@@ -119,9 +123,14 @@ class OAuthServiceTest {
     }
 
     private OAuthStateEntity state(String provider, Instant expiresAt, Instant usedAt) {
+        return state(provider, expiresAt, usedAt, OAuthClient.WEB);
+    }
+
+    private OAuthStateEntity state(String provider, Instant expiresAt, Instant usedAt, OAuthClient client) {
         OAuthStateEntity entity = new OAuthStateEntity();
         entity.setState("s");
         entity.setProvider(provider);
+        entity.setClient(client);
         entity.setExpiresAt(expiresAt);
         entity.setUsedAt(usedAt);
         entity.setCreatedAt(Instant.now());
@@ -164,5 +173,44 @@ class OAuthServiceTest {
 
         assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", null))
                 .isInstanceOf(OAuthFailedException.class);
+    }
+
+    @Test
+    void remembersWhichClientStartedTheFlow() {
+        when(stateRepository.findById("s"))
+                .thenReturn(Optional.of(state("google", Instant.now().plusSeconds(60), null, OAuthClient.MOBILE)));
+
+        // The callback arrives from the provider and carries nothing about who asked, so
+        // the only place this can come from is the row written at the authorize step.
+        assertThat(service(Map.of("google", configured())).consumeState("google", "s"))
+                .isEqualTo(OAuthClient.MOBILE);
+    }
+
+    @Test
+    void treatsAStateWrittenBeforeMobileExistedAsWeb() {
+        when(stateRepository.findById("s"))
+                .thenReturn(Optional.of(state("google", Instant.now().plusSeconds(60), null, null)));
+
+        assertThat(service(Map.of("google", configured())).consumeState("google", "s"))
+                .isEqualTo(OAuthClient.WEB);
+    }
+
+    @Test
+    void readsTheClientOfAnAlreadyConsumedStateWithoutThrowing() {
+        // The failure path needs to know where to send somebody back to, and by then the
+        // state has usually been consumed already.
+        when(stateRepository.findById("s")).thenReturn(Optional.of(
+                state("google", Instant.now().minusSeconds(1), Instant.now(), OAuthClient.MOBILE)));
+
+        assertThat(service(Map.of("google", configured())).clientFor("s")).isEqualTo(OAuthClient.MOBILE);
+    }
+
+    @Test
+    void fallsBackToTheWebAppForAnUnknownState() {
+        // A deep link into an app that may not be the one in front of the person is worse
+        // than a web page that can at least say what went wrong.
+        when(stateRepository.findById("nope")).thenReturn(Optional.empty());
+
+        assertThat(service(Map.of("google", configured())).clientFor("nope")).isEqualTo(OAuthClient.WEB);
     }
 }

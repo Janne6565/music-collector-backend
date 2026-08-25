@@ -1,13 +1,17 @@
 package com.musiccollector.controller.v1.schema;
 
+import com.musiccollector.model.action.OAuthExchangeRequest;
 import com.musiccollector.model.core.AuthProviderDto;
+import com.musiccollector.model.core.SessionDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -34,15 +38,19 @@ public interface OAuthApi {
     @GetMapping("/oauth/{provider}/authorize")
     @Operation(
             summary = "Begin an external sign-in",
-            description = "Redirects to the provider. Navigate to this, never fetch it.")
+            description = "Redirects to the provider. Navigate to this, never fetch it. "
+                    + "`client=mobile` finishes the flow by reopening the native app with a "
+                    + "one-time code instead of setting the browser's refresh cookie.")
     @ApiResponse(responseCode = "302", description = "Redirect to the provider")
-    ResponseEntity<Void> authorize(@PathVariable String provider);
+    ResponseEntity<Void> authorize(
+            @PathVariable String provider, @RequestParam(required = false) String client);
 
     @GetMapping("/oauth/{provider}/callback")
     @Operation(
             summary = "Where the provider sends the person back",
-            description = "Sets the refresh cookie and redirects into the app. No token ever "
-                    + "appears in a URL.")
+            description = "For a browser: sets the refresh cookie and redirects into the web "
+                    + "app. For a native client: redirects to the app's URL scheme with a "
+                    + "one-time handoff code. No token ever appears in a URL either way.")
     @ApiResponse(responseCode = "302", description = "Redirect into the app")
     ResponseEntity<Void> callback(
             @PathVariable String provider,
@@ -63,4 +71,14 @@ public interface OAuthApi {
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String error,
             @RequestParam(required = false) String user);
+
+    @PostMapping("/oauth/exchange")
+    @Operation(
+            summary = "Trade a handoff code for a session",
+            description = "The native half of the flow. The deep link carries only a one-time "
+                    + "code, which the app redeems here over its own connection; the refresh "
+                    + "token is returned in the body, as `X-Token-Mode: direct` would.")
+    @ApiResponse(responseCode = "200", description = "Signed in")
+    @ApiResponse(responseCode = "400", description = "The code is unknown, used or expired")
+    ResponseEntity<SessionDto> exchange(@Valid @RequestBody OAuthExchangeRequest request);
 }

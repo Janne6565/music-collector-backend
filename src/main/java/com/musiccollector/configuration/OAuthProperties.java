@@ -11,11 +11,16 @@ import java.util.Map;
  * sign-in screen asks the server which providers are available and renders buttons for
  * those alone, so an unconfigured provider is invisible rather than a button that fails.
  *
- * @param publicBaseUrl the app's own origin, used to build the redirect URI the provider
- *                      must have registered
+ * @param publicBaseUrl      the app's own origin, used to build the redirect URI the
+ *                           provider must have registered
+ * @param mobileRedirectUri  where the callback sends a native app once it has finished.
+ *                           A custom URL scheme, so the phone reopens the app rather than
+ *                           leaving the person looking at the website they just signed
+ *                           into. It is never given to the provider — providers only ever
+ *                           see {@code publicBaseUrl}.
  */
 @ConfigurationProperties(prefix = "music-collector.oauth")
-public record OAuthProperties(String publicBaseUrl, Map<String, Provider> providers) {
+public record OAuthProperties(String publicBaseUrl, String mobileRedirectUri, Map<String, Provider> providers) {
 
     /**
      * @param clientSecret for Apple this is a private key in PKCS#8 (the contents of the
@@ -47,6 +52,12 @@ public record OAuthProperties(String publicBaseUrl, Map<String, Provider> provid
         public boolean configured() {
             return clientId != null && !clientId.isBlank() && clientSecret != null && !clientSecret.isBlank();
         }
+    }
+
+    public String safeMobileRedirectUri() {
+        return mobileRedirectUri == null || mobileRedirectUri.isBlank()
+                ? "musiccollector://auth/callback"
+                : mobileRedirectUri;
     }
 
     public Map<String, Provider> safeProviders() {
