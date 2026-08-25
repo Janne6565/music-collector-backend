@@ -395,6 +395,22 @@ copy exists, through the same automatic removal as any other add. That is also w
 no separate "take it off the wishlist" toggle: the undoable line is the one mechanism, and
 a second one would be a second answer to the same question.
 
+**The artwork is resolved by the server, not carried by the entry.** A wish names an album,
+and a cover belongs to a pressing, so an entry has no picture of its own —
+`GET /api/v1/metadata/albums/covers` answers a whole screenful at once from the mirror: the
+cover of a pressing known to have art first, an unprobed one next, never one known to have
+none. It calls no catalogue, because a list of thirty rows must not become thirty upstream
+lookups, and the mirror already holds the pressing the entry was created from. Storing the
+URL on the entry instead was the obvious alternative and is wrong twice: it would be a
+synced field for something that is a shared cache rather than part of anybody's collection,
+and it would freeze the answer for entries added before the archive had one.
+
+Deriving the URL on the device was the other alternative, and search is Discogs-first — the
+Cover Art Archive resolves a front cover per MusicBrainz release group, but Discogs
+publishes no per-album image, so most entries would have got nothing. An unmirrored Discogs
+album therefore answers null and the client draws its format silhouette, which is the same
+thing it does for the four releases in ten whose cover URL 404s.
+
 ## Legal layer (turn 17)
 
 The German legal layer: an Impressum, a Datenschutzerklärung and Nutzungsbedingungen, a
