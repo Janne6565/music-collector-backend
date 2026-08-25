@@ -17,7 +17,20 @@ public record SharedCopyDto(
         Integer year,
         /** Already resolved: the copy's override wins over the catalogue's answer. */
         Format format,
+        /**
+         * The archive's artwork, or null when this copy has hidden it or there is none.
+         * Mirrors {@code catalogArtShown} on the clients -- hiding it is a decision about
+         * this copy's images, and a shelf somebody else reads must honour it too.
+         */
         String coverArtUrl,
+        /**
+         * The copy's own first photo, as a photo id the client turns into a content URL.
+         *
+         * The only picture a hand-entered copy can ever have: it points at no catalogue, so
+         * there is no cover art to fall back to. Null when the copy has no photos, or when
+         * it has starred the catalogue artwork instead ({@code copyPreviewSrc}).
+         */
+        String previewPhotoId,
         CoverThemeDto coverTheme,
         /** Media grade. Friends and up; null on a public page. */
         String condition,

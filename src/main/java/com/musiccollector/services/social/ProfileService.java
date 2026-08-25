@@ -1,6 +1,7 @@
 package com.musiccollector.services.social;
 
 import com.musiccollector.entity.CopyEntity;
+import com.musiccollector.entity.PhotoEntity;
 import com.musiccollector.entity.FriendshipEntity;
 import com.musiccollector.entity.ReleaseEntity;
 import com.musiccollector.entity.UserEntity;
@@ -19,6 +20,7 @@ import com.musiccollector.model.core.SharedWishlistDto;
 import com.musiccollector.model.exception.ProfileNotFoundException;
 import com.musiccollector.model.exception.ProfileNotVisibleException;
 import com.musiccollector.repository.CopyRepository;
+import com.musiccollector.repository.PhotoRepository;
 import com.musiccollector.repository.ReleaseRepository;
 import com.musiccollector.repository.UserRepository;
 import com.musiccollector.repository.WishlistItemRepository;
@@ -62,6 +64,7 @@ public class ProfileService {
     private final UserRepository userRepository;
     private final CopyRepository copyRepository;
     private final WishlistItemRepository wishlistItemRepository;
+    private final PhotoRepository photoRepository;
     private final ReleaseRepository releaseRepository;
     private final FriendshipService friendshipService;
     private final VisibilityService visibilityService;
@@ -117,9 +120,10 @@ public class ProfileService {
         List<CopyEntity> shown = truncated ? copies.subList(0, LIST_LIMIT) : copies;
 
         Map<String, ReleaseDto> releases = resolve(shown);
+        Map<UUID, UUID> previews = previewPhotos(owner.getId(), shown);
         List<SharedCopyDto> dtos = new ArrayList<>(shown.size());
         for (CopyEntity copy : shown) {
-            dtos.add(toDto(copy, releases.get(copy.getReleaseId()), prices, grades));
+            dtos.add(toDto(copy, releases.get(copy.getReleaseId()), previews.get(copy.getId()), prices, grades));
         }
         return new SharedCollectionDto(dtos, copyRepository.countVisible(owner.getId()), truncated);
     }
@@ -219,7 +223,32 @@ public class ProfileService {
         return byId;
     }
 
-    private SharedCopyDto toDto(CopyEntity copy, ReleaseDto release, boolean prices, boolean grades) {
+    /**
+     * The first photo of each copy, which is the picture that stands for it.
+     *
+     * The same rule as {@code copyPreviewSrc} on the clients: the copy's own first photo
+     * wins unless it has starred the catalogue artwork instead. Resolved here rather than
+     * left to the viewer's device, because the viewer has none of the owner's photos and
+     * cannot ask the strip which one is first.
+     */
+    private Map<UUID, UUID> previewPhotos(UUID ownerId, List<CopyEntity> copies) {
+        List<UUID> ids = copies.stream()
+                .filter(copy -> !PREFERRED_CATALOG_ART.equalsIgnoreCase(copy.getCatalogArt()))
+                .map(CopyEntity::getId)
+                .toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, UUID> first = new HashMap<>();
+        // Ordered by sortIndex, so the first row seen for a copy is the one the strip shows.
+        for (PhotoEntity photo : photoRepository.findVisibleForCopies(ownerId, ids)) {
+            first.putIfAbsent(photo.getCopyId(), photo.getId());
+        }
+        return first;
+    }
+
+    private SharedCopyDto toDto(
+            CopyEntity copy, ReleaseDto release, UUID previewPhotoId, boolean prices, boolean grades) {
         String title = firstNonBlank(copy.getManualTitle(), release == null ? null : release.title(), "Untitled");
         String artist =
                 firstNonBlank(copy.getManualArtist(), release == null ? null : release.artistName(), "Unknown artist");
@@ -231,7 +260,12 @@ public class ProfileService {
                 artist,
                 year,
                 format(copy, release),
-                release == null ? null : release.coverArtUrl(),
+                // `catalogArtShown`, server-side: a copy that took the archive's artwork out
+                // of its own images has done so everywhere, not only on the owner's device.
+                HIDDEN_CATALOG_ART.equalsIgnoreCase(copy.getCatalogArt()) || release == null
+                        ? null
+                        : release.coverArtUrl(),
+                previewPhotoId == null ? null : previewPhotoId.toString(),
                 release == null ? null : release.coverTheme(),
                 grades ? copy.getCondition() : null,
                 grades ? copy.getSleeveCondition() : null,
@@ -239,6 +273,11 @@ public class ProfileService {
                 prices ? copy.getCurrency() : null,
                 copy.getCreatedAt());
     }
+
+    /** Mirrors the shared package's CatalogArtChoice, which the entity stores as text. */
+    private static final String PREFERRED_CATALOG_ART = "PREFERRED";
+
+    private static final String HIDDEN_CATALOG_ART = "HIDDEN";
 
     /** The copy's own answer first, exactly as {@code copyFormat} does on the clients. */
     private Format format(CopyEntity copy, ReleaseDto release) {
