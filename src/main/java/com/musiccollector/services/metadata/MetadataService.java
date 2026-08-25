@@ -9,6 +9,7 @@ import com.musiccollector.configuration.CacheConfig;
 import com.musiccollector.entity.ArtistImageEntity;
 import com.musiccollector.entity.ReleaseEntity;
 import com.musiccollector.entity.ReleaseGroupEntity;
+import com.musiccollector.model.core.AlbumCoverDto;
 import com.musiccollector.model.core.AlbumDto;
 import com.musiccollector.model.core.ArtistDto;
 import com.musiccollector.model.core.ArtistImageDto;
@@ -28,7 +29,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -247,6 +253,98 @@ public class MetadataService {
                 .map(this::upsert)
                 .flatMap(Optional::stream)
                 .toList();
+    }
+
+    /** A hand-entered album ({@code local:<uuid>}) is in no catalogue and never will be. */
+    private static final String MANUAL_PREFIX = "local:";
+
+    /**
+     * The artwork for a set of albums, resolved from what is already mirrored.
+     *
+     * <p>An album is not a pressing and so has no cover of its own — a wishlist entry names
+     * an album, which is why it arrives here with nothing to render. The answer is the cover
+     * of one of the album's releases: a pressing known to have art first, an unprobed one
+     * next, never one known to have none.
+     *
+     * <p>Nothing here calls a catalogue. A wishlist of thirty rows must not cost thirty
+     * upstream requests, and the mirror already holds the pressing the entry was created
+     * from — searching for a record is how it got onto the list in the first place.
+     *
+     * <p>Where the mirror has nothing, a MusicBrainz album still has an address: the Cover
+     * Art Archive resolves a front cover per release group. Discogs publishes no such
+     * per-album image, so an unmirrored Discogs album answers null and the client draws its
+     * format placeholder — which is the same thing it does when the URL 404s.
+     */
+    @Transactional(readOnly = true)
+    public List<AlbumCoverDto> albumCovers(Collection<String> albumIds) {
+        // Asked-for id -> the normalised reference it is stored under. Ordered, because the
+        // response mirrors the request, and de-duplicated: a client may ask twice.
+        Map<String, String> wanted = new LinkedHashMap<>();
+        for (String albumId : albumIds) {
+            if (albumId == null || albumId.isBlank() || albumId.startsWith(MANUAL_PREFIX)) {
+                continue;
+            }
+            wanted.putIfAbsent(albumId, ExternalRef.parse(albumId).toString());
+        }
+
+        Map<String, ReleaseGroupEntity> groups = new HashMap<>();
+        for (ReleaseGroupEntity group : releaseGroupRepository.findAllByExternalIdIn(wanted.values())) {
+            groups.put(group.getExternalId(), group);
+        }
+        Map<UUID, String> mirrored = mirroredCovers(groups.values());
+
+        return wanted.entrySet().stream()
+                .map(entry -> {
+                    ReleaseGroupEntity group = groups.get(entry.getValue());
+                    String cover = group == null ? null : mirrored.get(group.getId());
+                    return new AlbumCoverDto(
+                            entry.getKey(), cover != null ? cover : archiveCover(entry.getValue()));
+                })
+                .toList();
+    }
+
+    /**
+     * The best cover the mirror holds per album.
+     *
+     * <p>"Best" is a definite yes ahead of a not-yet-asked, because a release the archive has
+     * confirmed art for will render and an unprobed one is a guess. Ties resolve by external
+     * id so the same album does not change picture between two identical requests.
+     */
+    private Map<UUID, String> mirroredCovers(Collection<ReleaseGroupEntity> groups) {
+        if (groups.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> ids = groups.stream().map(ReleaseGroupEntity::getId).toList();
+        Comparator<ReleaseEntity> best = Comparator
+                .comparingInt((ReleaseEntity release) -> Boolean.TRUE.equals(release.getHasCoverArt()) ? 0 : 1)
+                .thenComparing(ReleaseEntity::getExternalId);
+
+        Map<UUID, ReleaseEntity> chosen = new HashMap<>();
+        for (ReleaseEntity release : releaseRepository.findAllByReleaseGroupIdIn(ids)) {
+            if (release.getCoverArtUrl() == null || Boolean.FALSE.equals(release.getHasCoverArt())) {
+                continue;
+            }
+            chosen.merge(release.getReleaseGroupId(), release,
+                    (current, candidate) -> best.compare(candidate, current) < 0 ? candidate : current);
+        }
+
+        Map<UUID, String> covers = new HashMap<>();
+        chosen.forEach((groupId, release) -> covers.put(groupId, release.getCoverArtUrl()));
+        return covers;
+    }
+
+    /** The Cover Art Archive's own answer for an album, which only MusicBrainz albums have. */
+    private String archiveCover(String albumRef) {
+        ExternalRef ref = ExternalRef.parse(albumRef);
+        if (ref.source() != ReleaseSource.MUSICBRAINZ) {
+            return null;
+        }
+        try {
+            return coverArtClient.frontCoverUrlForGroup(UUID.fromString(ref.id()).toString());
+        } catch (IllegalArgumentException e) {
+            // Not an mbid, so not an address the archive can resolve.
+            return null;
+        }
     }
 
     /**

@@ -16,4 +16,7 @@ public interface ReleaseRepository extends JpaRepository<ReleaseEntity, UUID> {
 
     /** Barcode scans check the local mirror before ever calling MusicBrainz. */
     List<ReleaseEntity> findAllByBarcode(String barcode);
+
+    /** Every mirrored pressing of a set of albums, for resolving album artwork. */
+    List<ReleaseEntity> findAllByReleaseGroupIdIn(Collection<UUID> releaseGroupIds);
 }

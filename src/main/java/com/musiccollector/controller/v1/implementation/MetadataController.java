@@ -1,6 +1,7 @@
 package com.musiccollector.controller.v1.implementation;
 
 import com.musiccollector.controller.v1.schema.MetadataApi;
+import com.musiccollector.model.core.AlbumCoverDto;
 import com.musiccollector.model.core.ArtistDto;
 import com.musiccollector.model.core.ArtistImageDto;
 import com.musiccollector.model.core.DiscographyDto;
@@ -50,6 +51,11 @@ public class MetadataController implements MetadataApi {
     @Override
     public ResponseEntity<List<ReleaseDto>> releasesInGroup(String albumId, int limit) {
         return ResponseEntity.ok(metadataService.releasesInGroup(albumId, limit));
+    }
+
+    @Override
+    public ResponseEntity<List<AlbumCoverDto>> albumCovers(List<String> albumIds) {
+        return ResponseEntity.ok(metadataService.albumCovers(albumIds));
     }
 
     @Override

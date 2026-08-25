@@ -1,5 +1,6 @@
 package com.musiccollector.controller.v1.schema;
 
+import com.musiccollector.model.core.AlbumCoverDto;
 import com.musiccollector.model.core.ArtistDto;
 import com.musiccollector.model.core.ArtistImageDto;
 import com.musiccollector.model.core.DiscographyDto;
@@ -98,6 +99,20 @@ public interface MetadataApi {
     ResponseEntity<List<ReleaseDto>> releasesInGroup(
             @PathVariable("albumId") @NotBlank @Size(max = 120) String albumId,
             @RequestParam(value = "limit", defaultValue = "25") @Min(1) @Max(100) int limit);
+
+    @GetMapping("/albums/covers")
+    @Operation(
+            summary = "The artwork for a set of albums",
+            description = "For screens that hold albums rather than pressings — a wishlist entry names an "
+                    + "album, so it carries no cover of its own. Answered from the local mirror, never "
+                    + "from a catalogue: a list of thirty rows is one request, not thirty upstream "
+                    + "lookups. `coverArtUrl` is null where nothing known has a cover, and the URL may "
+                    + "still 404, so clients keep their placeholder either way. Ids are echoed back "
+                    + "exactly as they were asked for; hand-entered `local:` albums are left out of the "
+                    + "response entirely.")
+    @ApiResponse(responseCode = "200", description = "One entry per resolvable album, in the order asked")
+    ResponseEntity<List<AlbumCoverDto>> albumCovers(
+            @RequestParam("albumId") @Size(min = 1, max = 100) List<@NotBlank @Size(max = 120) String> albumIds);
 
     @GetMapping("/releases/{releaseId}")
     @Operation(summary = "Full detail for one release, including its cover theme",
