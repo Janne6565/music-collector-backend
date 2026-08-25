@@ -4,6 +4,7 @@ import com.musiccollector.configuration.StorageProperties;
 import com.musiccollector.entity.PhotoEntity;
 import com.musiccollector.model.core.PhotoUploadDto;
 import com.musiccollector.model.exception.PhotoNotFoundException;
+import com.musiccollector.model.exception.PhotoOwnerRequiredException;
 import com.musiccollector.model.exception.PhotoTooLargeException;
 import com.musiccollector.model.exception.UnsupportedPhotoTypeException;
 import com.musiccollector.repository.CopyRepository;
@@ -47,7 +48,12 @@ public class PhotoService {
      * exists on the device before it is ever uploaded, and it must keep its identity.
      */
     @Transactional
-    public PhotoUploadDto upload(UUID userId, UUID photoId, UUID copyId, MultipartFile file) {
+    public PhotoUploadDto upload(UUID userId, UUID photoId, UUID copyId, UUID wishId, MultipartFile file) {
+        // Checked before a single byte is stored: the object goes to MinIO first, and an
+        // upload no record can ever reference is an object nothing will ever clean up.
+        if ((copyId == null) == (wishId == null)) {
+            throw new PhotoOwnerRequiredException();
+        }
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_TYPES.contains(contentType.toLowerCase())) {
             throw new UnsupportedPhotoTypeException(String.valueOf(contentType));
@@ -69,6 +75,7 @@ public class PhotoService {
         entity.setId(photoId);
         entity.setUserId(userId);
         entity.setCopyId(copyId);
+        entity.setWishId(wishId);
         entity.setStorageKey(key);
         entity.setContentType(contentType);
         entity.setByteSize(file.getSize());
@@ -86,7 +93,12 @@ public class PhotoService {
         entity.setSyncSeq(0L);
         photoRepository.save(entity);
 
-        log.debug("Stored photo {} for copy {} ({} bytes)", photoId, copyId, file.getSize());
+        log.debug(
+                "Stored photo {} for {} {} ({} bytes)",
+                photoId,
+                copyId == null ? "wish" : "copy",
+                copyId == null ? wishId : copyId,
+                file.getSize());
         return new PhotoUploadDto(photoId.toString(), key, contentType, file.getSize());
     }
 
@@ -122,6 +134,13 @@ public class PhotoService {
             return true;
         }
         if (!visibilityService.canSeeCollection(viewerId, ownerId)) {
+            return false;
+        }
+        // A wish's picture is nobody else's business. A wishlist has no per-entry
+        // visibility of its own, and a shared shelf is a shelf of records somebody owns —
+        // so there is no answer here that would let a friend through, and the safe answer
+        // is the true one.
+        if (photo.getCopyId() == null) {
             return false;
         }
         // The copy's own answer still applies. A picture of a copy hidden one by one is

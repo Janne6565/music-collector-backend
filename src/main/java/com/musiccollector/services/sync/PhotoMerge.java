@@ -19,7 +19,7 @@ import java.util.Objects;
 public final class PhotoMerge {
 
     public static final List<String> MERGEABLE_FIELDS =
-            List.of("copyId", "storageKey", "contentType", "byteSize", "sortIndex", "deletedAt");
+            List.of("copyId", "wishId", "storageKey", "contentType", "byteSize", "sortIndex", "deletedAt");
 
     private PhotoMerge() {}
 
@@ -52,6 +52,7 @@ public final class PhotoMerge {
         return new SyncPhotoDto(
                 local.id(),
                 (String) values.get("copyId"),
+                (String) values.get("wishId"),
                 (String) values.get("storageKey"),
                 (String) values.get("contentType"),
                 (Long) values.get("byteSize"),
@@ -79,6 +80,7 @@ public final class PhotoMerge {
     private static Object valueOf(SyncPhotoDto photo, String field) {
         return switch (field) {
             case "copyId" -> photo.copyId();
+            case "wishId" -> photo.wishId();
             case "storageKey" -> photo.storageKey();
             case "contentType" -> photo.contentType();
             case "byteSize" -> photo.byteSize();

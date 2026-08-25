@@ -24,8 +24,13 @@ public class PhotoEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "copy_id", nullable = false)
+    /** The copy this pictures, or null when it belongs to a wishlist entry instead. */
+    @Column(name = "copy_id")
     private UUID copyId;
+
+    /** The wishlist entry this pictures. Exactly one of the two owners is set. */
+    @Column(name = "wish_id")
+    private UUID wishId;
 
     @Column(name = "storage_key", nullable = false)
     private String storageKey;

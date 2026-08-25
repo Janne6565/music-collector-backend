@@ -29,14 +29,19 @@ import java.util.UUID;
 public interface PhotoApi {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Upload the bytes for a photo the client has already created")
+    @Operation(
+            summary = "Upload the bytes for a photo the client has already created",
+            description = "A photo pictures either a copy or a wishlist entry, so exactly one of "
+                    + "`copyId` and `wishId` is given. Naming both, or neither, is a 400.")
     @ApiResponse(responseCode = "200", description = "Stored")
+    @ApiResponse(responseCode = "400", description = "No owner, or two owners")
     @ApiResponse(responseCode = "401", description = "Not signed in")
     @ApiResponse(responseCode = "413", description = "Too large")
     @ApiResponse(responseCode = "415", description = "Not an image this app stores")
     ResponseEntity<PhotoUploadDto> upload(
             @RequestParam("photoId") UUID photoId,
-            @RequestParam("copyId") UUID copyId,
+            @RequestParam(value = "copyId", required = false) UUID copyId,
+            @RequestParam(value = "wishId", required = false) UUID wishId,
             @RequestParam("file") MultipartFile file);
 
     @GetMapping("/{id}/content")

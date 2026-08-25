@@ -163,7 +163,11 @@ public class SyncService {
     }
 
     private void applyPhoto(PhotoEntity entity, SyncPhotoDto dto) {
-        entity.setCopyId(UUID.fromString(dto.copyId()));
+        // Either owner may be absent: a photo pictures a copy or a wishlist entry, never
+        // both. Parsed leniently rather than assumed, because an owner-less row from a
+        // client this build has not met is unreachable, not dangerous.
+        entity.setCopyId(parseId(dto.copyId()));
+        entity.setWishId(parseId(dto.wishId()));
         entity.setStorageKey(dto.storageKey());
         entity.setContentType(dto.contentType() == null ? "application/octet-stream" : dto.contentType());
         entity.setByteSize(dto.byteSize() == null ? 0L : dto.byteSize());
@@ -173,10 +177,15 @@ public class SyncService {
         entity.setFieldClocks(writeClocks(dto.fieldClocks()));
     }
 
+    private static UUID parseId(String value) {
+        return value == null || value.isBlank() ? null : UUID.fromString(value);
+    }
+
     private SyncPhotoDto toPhotoDto(PhotoEntity entity) {
         return new SyncPhotoDto(
                 entity.getId().toString(),
-                entity.getCopyId().toString(),
+                entity.getCopyId() == null ? null : entity.getCopyId().toString(),
+                entity.getWishId() == null ? null : entity.getWishId().toString(),
                 entity.getStorageKey(),
                 entity.getContentType(),
                 entity.getByteSize(),

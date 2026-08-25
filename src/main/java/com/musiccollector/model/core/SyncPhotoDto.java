@@ -11,7 +11,10 @@ import java.util.Map;
  */
 public record SyncPhotoDto(
         String id,
+        /** The copy this pictures, or null when it pictures a wishlist entry instead. */
         String copyId,
+        /** The wishlist entry this pictures. Exactly one of the two owners is set. */
+        String wishId,
         String storageKey,
         String contentType,
         Long byteSize,

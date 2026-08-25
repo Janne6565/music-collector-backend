@@ -4,6 +4,7 @@ import com.musiccollector.configuration.StorageProperties;
 import com.musiccollector.entity.PhotoEntity;
 import com.musiccollector.model.core.PhotoUploadDto;
 import com.musiccollector.model.exception.PhotoNotFoundException;
+import com.musiccollector.model.exception.PhotoOwnerRequiredException;
 import com.musiccollector.model.exception.PhotoTooLargeException;
 import com.musiccollector.model.exception.UnsupportedPhotoTypeException;
 import com.musiccollector.entity.CopyEntity;
@@ -13,6 +14,7 @@ import com.musiccollector.services.social.VisibilityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -27,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +38,7 @@ class PhotoServiceTest {
     private static final UUID USER = UUID.randomUUID();
     private static final UUID PHOTO = UUID.randomUUID();
     private static final UUID COPY = UUID.randomUUID();
+    private static final UUID WISH = UUID.randomUUID();
     private static final UUID STRANGER = UUID.randomUUID();
     private static final long MAX_BYTES = 1_000_000;
 
@@ -64,7 +68,7 @@ class PhotoServiceTest {
         when(photoRepository.findById(PHOTO)).thenReturn(Optional.empty());
         when(photoRepository.save(any())).thenAnswer(call -> call.getArgument(0));
 
-        PhotoUploadDto result = service.upload(USER, PHOTO, COPY, file("image/jpeg", 128));
+        PhotoUploadDto result = service.upload(USER, PHOTO, COPY, null, file("image/jpeg", 128));
 
         // Namespaced so one account's objects can never be confused with another's.
         assertThat(result.storageKey()).isEqualTo(USER + "/" + PHOTO);
@@ -73,9 +77,9 @@ class PhotoServiceTest {
 
     @Test
     void rejectsAnythingThatIsNotAnImageItStores() {
-        assertThatThrownBy(() -> service.upload(USER, PHOTO, COPY, file("application/pdf", 10)))
+        assertThatThrownBy(() -> service.upload(USER, PHOTO, COPY, null, file("application/pdf", 10)))
                 .isInstanceOf(UnsupportedPhotoTypeException.class);
-        assertThatThrownBy(() -> service.upload(USER, PHOTO, COPY, file(null, 10)))
+        assertThatThrownBy(() -> service.upload(USER, PHOTO, COPY, null, file(null, 10)))
                 .isInstanceOf(UnsupportedPhotoTypeException.class);
 
         // Nothing reaches storage: the check runs before the write, not after it.
@@ -84,7 +88,7 @@ class PhotoServiceTest {
 
     @Test
     void rejectsAnOversizedUploadBeforeStoringIt() {
-        assertThatThrownBy(() -> service.upload(USER, PHOTO, COPY, file("image/jpeg", (int) MAX_BYTES + 1)))
+        assertThatThrownBy(() -> service.upload(USER, PHOTO, COPY, null, file("image/jpeg", (int) MAX_BYTES + 1)))
                 .isInstanceOf(PhotoTooLargeException.class);
 
         verify(storageService, never()).put(any(), any(), anyLong(), any());
@@ -96,7 +100,7 @@ class PhotoServiceTest {
         when(photoRepository.save(any())).thenAnswer(call -> call.getArgument(0));
 
         for (String type : new String[] {"image/jpeg", "image/png", "image/webp", "image/heic"}) {
-            assertThat(service.upload(USER, UUID.randomUUID(), COPY, file(type, 16)).contentType())
+            assertThat(service.upload(USER, UUID.randomUUID(), COPY, null, file(type, 16)).contentType())
                     .isEqualTo(type);
         }
     }
@@ -155,6 +159,57 @@ class PhotoServiceTest {
         when(storageService.get(any())).thenReturn(null);
 
         assertThatCode(() -> service.download(USER, PHOTO)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void storesAPictureThatBelongsToAWishlistEntryInstead() {
+        // The record no catalogue has: nothing can ever hand this entry artwork, so the
+        // only cover it will ever have is this upload.
+        PhotoUploadDto result = service.upload(USER, PHOTO, null, WISH, file("image/jpeg", 128));
+
+        ArgumentCaptor<PhotoEntity> saved = ArgumentCaptor.forClass(PhotoEntity.class);
+        verify(photoRepository).save(saved.capture());
+        assertThat(saved.getValue().getWishId()).isEqualTo(WISH);
+        assertThat(saved.getValue().getCopyId()).isNull();
+        // The key never mentioned the owner, which is why re-parenting one costs nothing.
+        assertThat(result.storageKey()).isEqualTo(USER + "/" + PHOTO);
+    }
+
+    @Test
+    void refusesAnUploadThatNamesNoOwnerOrTwo() {
+        // Checked before a byte is stored: the object goes to MinIO first, and an upload
+        // no record can reference is an object nothing will ever clean up.
+        assertThatThrownBy(() -> service.upload(USER, PHOTO, null, null, file("image/jpeg", 8)))
+                .isInstanceOf(PhotoOwnerRequiredException.class);
+        assertThatThrownBy(() -> service.upload(USER, PHOTO, COPY, WISH, file("image/jpeg", 8)))
+                .isInstanceOf(PhotoOwnerRequiredException.class);
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void keepsAWishesPictureToItsOwnerEvenWhenTheShelfIsOpen() {
+        // A wishlist entry is not a record on a shelf, and it has no visibility of its own
+        // to consult — so there is no answer here that lets a friend through.
+        when(photoRepository.findById(PHOTO)).thenReturn(Optional.of(wishPhotoOf(STRANGER)));
+        when(visibilityService.canSeeCollection(USER, STRANGER)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.download(USER, PHOTO)).isInstanceOf(PhotoNotFoundException.class);
+        verifyNoInteractions(copyRepository);
+    }
+
+    @Test
+    void stillServesAWishesPictureToTheOwner() {
+        when(photoRepository.findById(PHOTO)).thenReturn(Optional.of(wishPhotoOf(USER)));
+        when(storageService.get(any())).thenReturn(null);
+
+        assertThatCode(() -> service.download(USER, PHOTO)).doesNotThrowAnyException();
+    }
+
+    private static PhotoEntity wishPhotoOf(UUID owner) {
+        PhotoEntity photo = photoOf(owner);
+        photo.setCopyId(null);
+        photo.setWishId(WISH);
+        return photo;
     }
 
     private static PhotoEntity photoOf(UUID owner) {

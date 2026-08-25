@@ -24,8 +24,9 @@ public class PhotoController implements PhotoApi {
     private final CurrentUser currentUser;
 
     @Override
-    public ResponseEntity<PhotoUploadDto> upload(UUID photoId, UUID copyId, MultipartFile file) {
-        return ResponseEntity.ok(photoService.upload(currentUser.require().getId(), photoId, copyId, file));
+    public ResponseEntity<PhotoUploadDto> upload(UUID photoId, UUID copyId, UUID wishId, MultipartFile file) {
+        return ResponseEntity.ok(
+                photoService.upload(currentUser.require().getId(), photoId, copyId, wishId, file));
     }
 
     @Override
