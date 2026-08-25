@@ -411,6 +411,48 @@ publishes no per-album image, so most entries would have got nothing. An unmirro
 album therefore answers null and the client draws its format silhouette, which is the same
 thing it does for the four releases in ten whose cover URL 404s.
 
+## The wishlist entry, on the web (turn 18)
+
+Screens `16j`–`16r`: clicking a row on `16g` lifts a modal over the list, the way the copy
+detail does. A wish holds no pressing, so everything it knows fits in one panel and there
+is nothing a full page would have had room for — and the list behind it is the workspace
+you are actually in.
+
+### Decisions
+
+**Format and note edit in place, with no Save.** An entry is two editable fields, and a
+sheet that asks you to confirm two fields is ceremony. The note is written when typing
+stops rather than on every keystroke; the format lands on the click. That leaves the add
+sheet (`16c`) as the *add* sheet only — it keeps its Save because until it is saved there is
+no entry to edit — and mobile keeps opening its own sheet (`16b`), because a sheet suits a
+thumb better than inline fields.
+
+**The row lost its buttons.** Turn 16 gave each row "Found it", edit and remove; turn 18
+redraws `16g` without them, because all three verbs are in the modal one click away and
+twenty-four rows each carrying three buttons is a list you read past rather than read. The
+drag handle stays: it is the one control that acts on the list rather than on the entry.
+
+**Pressings are an optional lookup that may fail.** A wish names an album, so the pressing
+table is reference material — 47 of them for *Bitches Brew*, 25 at a time, a second or two,
+and it can 502. It never runs on open, nothing on the entry waits for it, and both of its
+failures stay inside its own box. For a hand-entered album the section is a line of text
+rather than a disabled button: there is nothing there to enable.
+
+**"I found a copy" stands alone as the primary; Remove is a quiet text action at the far
+end of the footer.** A wish is cheap to lose and expensive to lose by accident. The confirm
+appears in the footer where the action was, not in a second dialog — and while the removal
+runs the entry dims, the primary action goes away, and the undo waits on the list.
+
+**An entry that leaves while you are reading it is news, not a crash.** When another device
+files a copy that satisfies the wish, the modal keeps the album in place and swaps only the
+parts that stopped being true (`16r`), with the same wording as the auto-removal line on
+`16e`. It is never shown for a removal of your own: that entry is gone because this modal
+removed it, and saying somebody else filed a copy would be the wrong news.
+
+**Position is only shown once somebody has dragged the entry somewhere.** `sortIndex` null
+means "never placed by hand", which is not position 1 — printing "1st" for it would invent
+a decision nobody made.
+
 ## Legal layer (turn 17)
 
 The German legal layer: an Impressum, a Datenschutzerklärung and Nutzungsbedingungen, a
