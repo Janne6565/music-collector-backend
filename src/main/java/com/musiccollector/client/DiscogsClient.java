@@ -146,6 +146,29 @@ public class DiscogsClient {
         }
     }
 
+    /**
+     * The bytes behind one Discogs image URL, for palette sampling.
+     *
+     * Not paced: these live on Discogs' image CDN rather than the API host, so they do not
+     * spend the per-minute quota the pacer is protecting. A cover that will not load is an
+     * answer — empty — rather than a failure, exactly as on the Cover Art Archive side.
+     */
+    public Optional<byte[]> fetchImage(String url) {
+        if (!isUsable(url)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.ofNullable(restClient
+                    .get()
+                    .uri(java.net.URI.create(url))
+                    .retrieve()
+                    .body(byte[].class));
+        } catch (RestClientException | IllegalArgumentException e) {
+            log.debug("Could not fetch Discogs image {} ({})", url, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
     /** Whether covers will come back at all, so callers can fall back rather than show gaps. */
     public boolean servesImages() {
         return properties.authenticated();

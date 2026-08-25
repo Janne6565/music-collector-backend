@@ -386,13 +386,7 @@ public class MetadataService {
      * never told us about, eventually get a truthful answer.
      */
     private void applyCoverPalette(ReleaseEntity entity) {
-        // The archive is keyed by MusicBrainz mbid, so a Discogs pressing has no palette to
-        // sample here — its cover comes from Discogs itself.
-        ExternalRef ref = ExternalRef.parse(entity.getExternalId());
-        if (ref.source() != ReleaseSource.MUSICBRAINZ) {
-            return;
-        }
-        Optional<byte[]> thumbnail = coverArtClient.fetchThumbnail(ref.id());
+        Optional<byte[]> thumbnail = fetchCoverThumbnail(entity);
         entity.setHasCoverArt(thumbnail.isPresent());
 
         thumbnail.flatMap(colorExtractor::extract).ifPresentOrElse(palette -> {
@@ -404,6 +398,23 @@ public class MetadataService {
         }, () -> log.debug("No cover art for release {}", entity.getExternalId()));
 
         releaseRepository.save(entity);
+    }
+
+    /**
+     * The bytes to sample, from whichever archive actually holds this pressing's cover.
+     *
+     * The Cover Art Archive is keyed by MusicBrainz mbid, so a Discogs pressing is not in
+     * it — its cover is the CDN URL the search already handed us. Leaving Discogs rows
+     * unsampled was worse than a missing theme: with no palette the row stayed "unknown"
+     * for ever, and every single detail open re-ran the lookup that was meant to happen
+     * once. Search results are Discogs-first, so that was most of the collection.
+     */
+    private Optional<byte[]> fetchCoverThumbnail(ReleaseEntity entity) {
+        ExternalRef ref = ExternalRef.parse(entity.getExternalId());
+        if (ref.source() == ReleaseSource.MUSICBRAINZ) {
+            return coverArtClient.fetchThumbnail(ref.id());
+        }
+        return discogsClient.fetchImage(entity.getCoverArtUrl());
     }
 
     private ReleaseDto toDto(ReleaseEntity entity) {
