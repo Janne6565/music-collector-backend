@@ -3,9 +3,10 @@ package com.musiccollector.model.core;
 import java.util.Locale;
 
 /**
- * The four formats the app tracks. MusicBrainz reports a much longer, messier list
- * ({@code 12" Vinyl}, {@code Enhanced CD}, {@code Digital Media}, …), so everything is
- * folded into these four plus OTHER.
+ * The four formats the app tracks. Both catalogues report a much longer, messier list —
+ * MusicBrainz says {@code 12" Vinyl}, {@code Enhanced CD}, {@code Digital Media}; Discogs
+ * says {@code Vinyl}, {@code CD}, {@code Cassette}, {@code File} — so everything folds into
+ * these four plus OTHER. The two vocabularies overlap enough that one matcher serves both.
  */
 public enum Format {
     VINYL,
@@ -14,7 +15,7 @@ public enum Format {
     DIGITAL,
     OTHER;
 
-    public static Format fromMusicBrainz(String mediaFormat) {
+    public static Format fromMediumName(String mediaFormat) {
         if (mediaFormat == null || mediaFormat.isBlank()) {
             return OTHER;
         }

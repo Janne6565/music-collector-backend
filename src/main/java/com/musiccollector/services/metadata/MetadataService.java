@@ -1,6 +1,8 @@
 package com.musiccollector.services.metadata;
 
 import com.musiccollector.client.CoverArtClient;
+import com.musiccollector.client.DiscogsClient;
+import com.musiccollector.client.DiscogsResponses;
 import com.musiccollector.client.MusicBrainzClient;
 import com.musiccollector.client.MusicBrainzResponses;
 import com.musiccollector.configuration.CacheConfig;
@@ -12,6 +14,7 @@ import com.musiccollector.model.core.ExternalRef;
 import com.musiccollector.model.core.ReleaseSource;
 import com.musiccollector.model.core.ReleaseDto;
 import com.musiccollector.model.exception.ReleaseNotFoundException;
+import com.musiccollector.model.exception.UpstreamUnavailableException;
 import com.musiccollector.repository.ReleaseGroupRepository;
 import com.musiccollector.repository.ReleaseRepository;
 import lombok.RequiredArgsConstructor;
@@ -48,18 +51,52 @@ public class MetadataService {
     private static final Logger log = LoggerFactory.getLogger(MetadataService.class);
 
     private final MusicBrainzClient musicBrainzClient;
+    private final DiscogsClient discogsClient;
     private final CoverArtClient coverArtClient;
     private final DominantColorExtractor colorExtractor;
     private final ReleaseRepository releaseRepository;
     private final ReleaseGroupRepository releaseGroupRepository;
 
+    /**
+     * Releases matching a query, Discogs first.
+     *
+     * Discogs is a marketplace for records, so the physical pressings people actually own
+     * are its core data; MusicBrainz treats them as secondary and frequently has none at
+     * all. MusicBrainz still answers when Discogs finds nothing or is unreachable, because
+     * a degraded result beats an error and the two catalogues do not overlap perfectly.
+     */
     @Cacheable(cacheNames = CacheConfig.METADATA_SEARCH, key = "#query + '|' + #limit")
     @Transactional
     public List<ReleaseDto> search(String query, int limit) {
+        List<ReleaseDto> fromDiscogs = fromDiscogs(() -> discogsClient.search(query, limit));
+        if (!fromDiscogs.isEmpty()) {
+            return fromDiscogs;
+        }
+        log.debug("Discogs had nothing for '{}'; falling back to MusicBrainz", query);
         return musicBrainzClient.searchReleases(query, limit).stream()
                 .map(this::upsert)
                 .flatMap(Optional::stream)
                 .toList();
+    }
+
+    /**
+     * Runs a Discogs query and persists what comes back, swallowing an unreachable upstream.
+     *
+     * A failure here is never the end of a search: MusicBrainz is still there, and Discogs
+     * times out under load often enough that letting it take the whole request down would
+     * be the wrong trade.
+     */
+    private List<ReleaseDto> fromDiscogs(
+            java.util.function.Supplier<List<DiscogsResponses.SearchResult>> query) {
+        try {
+            return query.get().stream()
+                    .map(this::upsertDiscogs)
+                    .flatMap(Optional::stream)
+                    .toList();
+        } catch (UpstreamUnavailableException e) {
+            log.warn("Discogs is unreachable, falling back to MusicBrainz: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     @Transactional
@@ -68,6 +105,12 @@ public class MetadataService {
         if (!known.isEmpty()) {
             log.debug("Barcode {} served from the local mirror ({} releases)", barcode, known.size());
             return known.stream().map(this::toDto).toList();
+        }
+        // A barcode is the one identifier printed on the sleeve, and Discogs indexes far
+        // more physical pressings by it.
+        List<ReleaseDto> fromDiscogs = fromDiscogs(() -> discogsClient.findByBarcode(barcode));
+        if (!fromDiscogs.isEmpty()) {
+            return fromDiscogs;
         }
         return musicBrainzClient.findByBarcode(barcode).stream()
                 .map(this::upsert)
@@ -126,9 +169,27 @@ public class MetadataService {
      */
     @Transactional
     public List<ReleaseDto> releasesInGroup(String albumId, int limit) {
-        // Only MusicBrainz albums have a release-group id to page by. A Discogs master is
-        // reached by artist and title instead, which is the next change, not this one.
         ExternalRef ref = ExternalRef.parse(albumId);
+
+        // The two catalogues share no identifiers, but they agree on what a record is
+        // called — so artist and title is what bridges a MusicBrainz album to Discogs'
+        // pressings of it. That bridge is the whole point: MusicBrainz lists two digital
+        // releases of Fred again..'s "ten days" and no vinyl at all, while Discogs has four
+        // vinyl pressings of it.
+        Optional<ReleaseGroupEntity> album = releaseGroupRepository.findByExternalId(ref.toString());
+        if (album.isPresent()) {
+            List<ReleaseDto> pressings = fromDiscogs(() -> discogsClient.pressingsOf(
+                    album.get().getArtistName(), album.get().getTitle(), limit));
+            if (!pressings.isEmpty()) {
+                return pressings;
+            }
+        }
+
+        // Nothing on Discogs, or an album this server has never mirrored. Only a
+        // MusicBrainz album can be paged by its own id.
+        if (ref.source() != ReleaseSource.MUSICBRAINZ) {
+            return List.of();
+        }
         return musicBrainzClient.findReleasesInGroup(ref.id(), limit).stream()
                 .map(this::upsert)
                 .flatMap(Optional::stream)
@@ -155,6 +216,57 @@ public class MetadataService {
             applyCoverPalette(entity);
         }
         return toDto(entity);
+    }
+
+    /** Discogs' half of {@link #upsert}: mirror it once, then serve it from here. */
+    private Optional<ReleaseDto> upsertDiscogs(DiscogsResponses.SearchResult result) {
+        if (result.id() == null) {
+            return Optional.empty();
+        }
+        String ref = DiscogsMapper.releaseRefOf(result);
+        return releaseRepository
+                .findByExternalId(ref)
+                .or(() -> persistDiscogs(result, ref))
+                .map(this::toDto);
+    }
+
+    private Optional<ReleaseEntity> persistDiscogs(DiscogsResponses.SearchResult result, String ref) {
+        ReleaseGroupEntity group = ensureDiscogsAlbum(result);
+
+        ReleaseEntity entity = new ReleaseEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setExternalId(ref);
+        entity.setReleaseGroupId(group.getId());
+        entity.setTitle(DiscogsMapper.titleOf(result.title()));
+        entity.setArtistName(DiscogsMapper.artistOf(result.title()));
+        entity.setFormat(DiscogsMapper.formatOf(result));
+        entity.setYear(result.year());
+        entity.setLabel(DiscogsMapper.labelOf(result));
+        entity.setCatalogNumber(result.catno());
+        entity.setCountry(result.country());
+        entity.setBarcode(DiscogsMapper.barcodeOf(result));
+        // Discogs search does not carry a release date or a track count; the pressing table
+        // shows what it has rather than inventing the rest.
+        entity.setCoverArtUrl(DiscogsMapper.coverUrlOf(result));
+        // Definite either way: Discogs told us outright, unlike the archive's constructed
+        // URL that has to be probed.
+        entity.setHasCoverArt(DiscogsMapper.coverUrlOf(result) != null);
+        entity.setFetchedAt(Instant.now());
+        return Optional.of(releaseRepository.save(entity));
+    }
+
+    private ReleaseGroupEntity ensureDiscogsAlbum(DiscogsResponses.SearchResult result) {
+        String albumRef = DiscogsMapper.albumRefOf(result);
+        return releaseGroupRepository.findByExternalId(albumRef).orElseGet(() -> {
+            ReleaseGroupEntity group = new ReleaseGroupEntity();
+            group.setId(UUID.randomUUID());
+            group.setExternalId(albumRef);
+            group.setTitle(DiscogsMapper.titleOf(result.title()));
+            group.setArtistName(DiscogsMapper.artistOf(result.title()));
+            group.setFirstReleaseYear(result.year());
+            group.setFetchedAt(Instant.now());
+            return releaseGroupRepository.save(group);
+        });
     }
 
     private Optional<ReleaseDto> upsert(MusicBrainzResponses.Release release) {
