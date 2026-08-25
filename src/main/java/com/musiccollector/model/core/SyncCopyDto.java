@@ -26,6 +26,14 @@ public record SyncCopyDto(
         String condition,
         /** The sleeve grade, graded separately from the media. */
         String sleeveCondition,
+        /**
+         * Show the release's own artwork instead of the copy's first photo.
+         *
+         * Boxed, because a client older than this field sends nothing at all and that has
+         * to stay distinguishable from a deliberate {@code false} while it travels. It is
+         * read as {@code false} the moment it lands — see {@code SyncService.apply}.
+         */
+        Boolean preferCatalogArt,
         Integer pricePaidCents,
         String currency,
         String purchasedOn,
