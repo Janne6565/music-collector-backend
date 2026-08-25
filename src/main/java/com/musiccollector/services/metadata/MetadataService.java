@@ -6,15 +6,18 @@ import com.musiccollector.client.DiscogsResponses;
 import com.musiccollector.client.MusicBrainzClient;
 import com.musiccollector.client.MusicBrainzResponses;
 import com.musiccollector.configuration.CacheConfig;
+import com.musiccollector.entity.ArtistImageEntity;
 import com.musiccollector.entity.ReleaseEntity;
 import com.musiccollector.entity.ReleaseGroupEntity;
 import com.musiccollector.model.core.AlbumDto;
 import com.musiccollector.model.core.ArtistDto;
+import com.musiccollector.model.core.ArtistImageDto;
 import com.musiccollector.model.core.ExternalRef;
 import com.musiccollector.model.core.ReleaseSource;
 import com.musiccollector.model.core.ReleaseDto;
 import com.musiccollector.model.exception.ReleaseNotFoundException;
 import com.musiccollector.model.exception.UpstreamUnavailableException;
+import com.musiccollector.repository.ArtistImageRepository;
 import com.musiccollector.repository.ReleaseGroupRepository;
 import com.musiccollector.repository.ReleaseRepository;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +59,7 @@ public class MetadataService {
     private final DominantColorExtractor colorExtractor;
     private final ReleaseRepository releaseRepository;
     private final ReleaseGroupRepository releaseGroupRepository;
+    private final ArtistImageRepository artistImageRepository;
 
     /**
      * Releases matching a query, Discogs first.
@@ -133,6 +137,55 @@ public class MetadataService {
                 .sorted(java.util.Comparator.comparing(
                         ArtistDto::score, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
                 .toList();
+    }
+
+    /**
+     * One artist's portrait, resolved once and then free.
+     *
+     * <p>Two upstream calls the first time: MusicBrainz's {@code discogs} URL relation says
+     * which Discogs artist this is, and that artist carries the pictures. Matching the two
+     * databases on name would need neither call and would be wrong often enough to matter —
+     * MusicBrainz holds at least three artists called "Daughter", and putting one band's
+     * face on another's row undoes the disambiguation the rest of the screen works to show.
+     *
+     * <p>Every outcome is written, including "there is no picture". Most of the cost of that
+     * answer is the lookup that discovered the artist has no Discogs link at all, and a row
+     * that will never have a portrait would otherwise re-pay it on every search.
+     *
+     * <p>An upstream failure is deliberately <em>not</em> cached: it is a statement about
+     * MusicBrainz's afternoon, not about the artist. It surfaces as an empty portrait and
+     * the next caller tries again.
+     */
+    @Transactional
+    public ArtistImageDto artistImage(UUID mbid) {
+        Optional<ArtistImageEntity> cached = artistImageRepository.findById(mbid);
+        if (cached.isPresent()) {
+            return new ArtistImageDto(cached.get().getImageUrl());
+        }
+        // Without a token Discogs returns no images at all, so the lookups would cost two
+        // upstream calls to learn nothing. Nothing is written either: the day a token
+        // appears, every artist should resolve rather than stay permanently blank.
+        if (!discogsClient.servesImages()) {
+            return new ArtistImageDto(null);
+        }
+
+        Optional<Long> discogsId;
+        Optional<String> imageUrl;
+        try {
+            discogsId = musicBrainzClient.discogsArtistId(mbid);
+            imageUrl = discogsId.flatMap(discogsClient::artistImageUrl);
+        } catch (UpstreamUnavailableException e) {
+            log.debug("Could not resolve a portrait for artist {}: {}", mbid, e.getMessage());
+            return new ArtistImageDto(null);
+        }
+
+        ArtistImageEntity entity = new ArtistImageEntity();
+        entity.setMbid(mbid);
+        entity.setDiscogsArtistId(discogsId.orElse(null));
+        entity.setImageUrl(imageUrl.orElse(null));
+        entity.setFetchedAt(Instant.now());
+        artistImageRepository.save(entity);
+        return new ArtistImageDto(entity.getImageUrl());
     }
 
     /**

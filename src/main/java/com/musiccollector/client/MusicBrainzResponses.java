@@ -66,6 +66,25 @@ public final class MusicBrainzResponses {
             @JsonProperty("primary-type") String primaryType,
             @JsonProperty("artist-credit") List<ArtistCredit> artistCredit) {}
 
+    /**
+     * An artist lookup asked for its URL relations.
+     *
+     * <p>The only reason to make this call is {@code relations}: MusicBrainz records where
+     * else on the web an artist lives, and one of those places is Discogs. That relation is
+     * an editor-verified statement that these two database entries are the same act, which
+     * is the difference between showing a portrait and showing a portrait of somebody else
+     * with the same name.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ArtistLookup(String id, String name, List<Relation> relations) {}
+
+    /** {@code type} is the relation's kind — "discogs", "official homepage", "wikidata". */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Relation(String type, RelationUrl url) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record RelationUrl(String resource) {}
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record LabelInfo(@JsonProperty("catalog-number") String catalogNumber, Label label) {}
 

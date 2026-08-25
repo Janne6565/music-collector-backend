@@ -10,7 +10,11 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Talks to the MusicBrainz web service.
@@ -24,6 +28,9 @@ public class MusicBrainzClient {
 
     private static final Logger log = LoggerFactory.getLogger(MusicBrainzClient.class);
     private static final String LOOKUP_INCLUDES = "artist-credits+labels+release-groups+media";
+
+    /** "https://www.discogs.com/artist/1055923" and "…/artist/1055923-Daughter" both occur. */
+    private static final Pattern DISCOGS_ARTIST_URL = Pattern.compile("/artist/(\\d+)");
 
     private final RestClient restClient;
     private final UpstreamPacer pacer;
@@ -121,6 +128,59 @@ public class MusicBrainzClient {
             return response.releases();
         } catch (RestClientException e) {
             throw new UpstreamUnavailableException("MusicBrainz", e);
+        }
+    }
+
+    /**
+     * Which Discogs artist this MusicBrainz artist is, if MusicBrainz knows.
+     *
+     * <p>The relation carries a page URL rather than an id — "https://www.discogs.com/artist/1055923",
+     * sometimes with a slug after it — so the id is read off the end. Anything that does
+     * not end in a number is a URL shape we have not seen, and is skipped rather than
+     * guessed at: a wrong id fetches a real artist who happens to be somebody else.
+     */
+    public Optional<Long> discogsArtistId(UUID mbid) {
+        pacer.awaitSlot();
+        MusicBrainzResponses.ArtistLookup artist;
+        try {
+            artist = restClient
+                    .get()
+                    .uri(uri -> uri.path("/artist/{mbid}")
+                            .queryParam("inc", "url-rels")
+                            .queryParam("fmt", "json")
+                            .build(mbid))
+                    .retrieve()
+                    .body(MusicBrainzResponses.ArtistLookup.class);
+        } catch (HttpClientErrorException.NotFound e) {
+            return Optional.empty();
+        } catch (RestClientException e) {
+            throw new UpstreamUnavailableException("MusicBrainz", e);
+        }
+        if (artist == null || artist.relations() == null) {
+            return Optional.empty();
+        }
+        return artist.relations().stream()
+                .filter(relation -> "discogs".equals(relation.type()))
+                .map(MusicBrainzResponses.Relation::url)
+                .filter(Objects::nonNull)
+                .map(MusicBrainzResponses.RelationUrl::resource)
+                .filter(Objects::nonNull)
+                .map(MusicBrainzClient::trailingId)
+                .flatMap(Optional::stream)
+                .findFirst();
+    }
+
+    /** Package-private for the test: this is the step that can quietly resolve to the wrong artist. */
+    static Optional<Long> trailingId(String resource) {
+        Matcher matcher = DISCOGS_ARTIST_URL.matcher(resource);
+        if (!matcher.find()) {
+            log.debug("Discogs relation '{}' has no artist id in it", resource);
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Long.parseLong(matcher.group(1)));
+        } catch (NumberFormatException e) {
+            return Optional.empty();
         }
     }
 

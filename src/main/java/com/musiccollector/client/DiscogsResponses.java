@@ -42,6 +42,27 @@ public final class DiscogsResponses {
             @JsonProperty("cover_image") String coverImage) {}
 
     /**
+     * One artist, fetched by id once MusicBrainz has said which id that is.
+     *
+     * <p>{@code images} is empty for an anonymous caller — Discogs serves pictures only to
+     * a request carrying a token — so an empty list means "no token" as readily as it means
+     * "no picture", and the caller checks which before believing it.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ArtistResponse(Long id, String name, List<ArtistImage> images) {}
+
+    /**
+     * One picture of an artist.
+     *
+     * <p>{@code type} is "primary" for the one Discogs leads with and "secondary" for the
+     * rest; the primary is the portrait, the secondaries are frequently live shots and
+     * record-sleeve scans. {@code uri150} is the square thumbnail, which is the only size
+     * an avatar has any use for.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ArtistImage(String type, String uri, String uri150) {}
+
+    /**
      * A format and what kind of one it is.
      *
      * <p>{@code name} is the medium ("Vinyl", "CD", "Cassette", "File"); {@code

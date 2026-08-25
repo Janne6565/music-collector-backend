@@ -5,10 +5,12 @@ import com.musiccollector.model.exception.UpstreamUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Talks to the Discogs database.
@@ -70,6 +72,60 @@ public class DiscogsClient {
                 .queryParam("type", "release")
                 .queryParam("per_page", 25)
                 .build());
+    }
+
+    /**
+     * The portrait for one artist, by Discogs id.
+     *
+     * <p>Prefers the image Discogs marks "primary": the secondaries on a well-filled artist
+     * are live photographs, sleeve scans and band logos, any of which would read as the
+     * wrong kind of thing in a 46px circle. The 150px thumbnail is taken rather than the
+     * full image — these avatars are 46 and 62 pixels, and the originals run past half a
+     * megabyte.
+     */
+    public Optional<String> artistImageUrl(long artistId) {
+        if (!properties.authenticated()) {
+            return Optional.empty();
+        }
+        pacer.awaitSlot();
+        DiscogsResponses.ArtistResponse artist;
+        try {
+            artist = restClient
+                    .get()
+                    .uri(uri -> uri.path("/artists/{id}").build(artistId))
+                    .retrieve()
+                    .body(DiscogsResponses.ArtistResponse.class);
+        } catch (HttpClientErrorException.NotFound e) {
+            // MusicBrainz pointed at an artist Discogs no longer has. That is an answer.
+            return Optional.empty();
+        } catch (RestClientException e) {
+            throw new UpstreamUnavailableException("Discogs", e);
+        }
+        return preferredImage(artist == null ? null : artist.images());
+    }
+
+    /**
+     * The one picture worth putting in a circle, out of everything Discogs holds.
+     *
+     * <p>Package-private for the test. Prefers the thumbnail of the primary image, falls
+     * back to the first image of any kind, and to the full-size URI when no thumbnail was
+     * generated. Blank strings are Discogs' way of saying "not for you" to an anonymous
+     * caller, and are treated as absent rather than handed to an {@code <img>}.
+     */
+    static Optional<String> preferredImage(List<DiscogsResponses.ArtistImage> images) {
+        if (images == null || images.isEmpty()) {
+            return Optional.empty();
+        }
+        return images.stream()
+                .filter(image -> "primary".equals(image.type()))
+                .findFirst()
+                .or(() -> images.stream().findFirst())
+                .map(image -> isUsable(image.uri150()) ? image.uri150() : image.uri())
+                .filter(DiscogsClient::isUsable);
+    }
+
+    private static boolean isUsable(String url) {
+        return url != null && !url.isBlank();
     }
 
     private List<DiscogsResponses.SearchResult> get(

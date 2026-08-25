@@ -1,6 +1,7 @@
 package com.musiccollector.controller.v1.schema;
 
 import com.musiccollector.model.core.ArtistDto;
+import com.musiccollector.model.core.ArtistImageDto;
 import com.musiccollector.model.core.DiscographyDto;
 import com.musiccollector.model.core.ReleaseDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -61,6 +62,19 @@ public interface MetadataApi {
     ResponseEntity<List<ArtistDto>> searchArtists(
             @RequestParam("q") @NotBlank @Size(max = 200) String query,
             @RequestParam(value = "limit", defaultValue = "5") @Min(1) @Max(25) int limit);
+
+    @GetMapping("/artists/{mbid}/image")
+    @Operation(
+            summary = "One artist's portrait",
+            description = "Its own endpoint, one artist at a time, because the first answer for any "
+                    + "artist costs two paced upstream calls — MusicBrainz for the `discogs` URL "
+                    + "relation that identifies the artist exactly, then Discogs for the picture. "
+                    + "Folding it into /artists would hold a list of five behind the slowest of them. "
+                    + "Answers are kept, so the second time is free. `imageUrl` is null when the "
+                    + "artist genuinely has no picture; clients fall back to the initial.")
+    @ApiResponse(responseCode = "200", description = "The portrait, or null when there is none")
+    @ApiResponse(responseCode = "429", description = "Per-IP rate limit exceeded")
+    ResponseEntity<ArtistImageDto> artistImage(@PathVariable UUID mbid);
 
     @GetMapping("/artists/{mbid}/albums")
     @Operation(

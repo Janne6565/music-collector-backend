@@ -2,6 +2,7 @@ package com.musiccollector.controller.v1.implementation;
 
 import com.musiccollector.controller.v1.schema.MetadataApi;
 import com.musiccollector.model.core.ArtistDto;
+import com.musiccollector.model.core.ArtistImageDto;
 import com.musiccollector.model.core.DiscographyDto;
 import com.musiccollector.model.core.ReleaseDto;
 import com.musiccollector.services.metadata.MetadataService;
@@ -33,6 +34,11 @@ public class MetadataController implements MetadataApi {
     @Override
     public ResponseEntity<List<ArtistDto>> searchArtists(String query, int limit) {
         return ResponseEntity.ok(metadataService.searchArtists(query.trim(), limit));
+    }
+
+    @Override
+    public ResponseEntity<ArtistImageDto> artistImage(UUID mbid) {
+        return ResponseEntity.ok(metadataService.artistImage(mbid));
     }
 
     @Override
