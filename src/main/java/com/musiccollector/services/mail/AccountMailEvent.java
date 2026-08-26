@@ -23,6 +23,18 @@ public sealed interface AccountMailEvent {
 
     record EmailConfirmationRequested(String recipient, String token) implements AccountMailEvent {}
 
+    /** The confirmation link for an address the account is moving to. */
+    record EmailChangeRequested(String recipient, String token) implements AccountMailEvent {}
+
+    /**
+     * The notice to the address being moved away from, carrying the undo.
+     *
+     * <p>Sent the moment the change is asked for rather than when it lands: if somebody else
+     * is at the keyboard, the old mailbox is the only place left to say so.
+     */
+    record EmailChangeStarted(String recipient, String newEmail, String cancelToken, Instant at)
+            implements AccountMailEvent {}
+
     record PasswordChanged(String recipient, Instant at) implements AccountMailEvent {}
 
     record SignInMethodLinked(String recipient, String provider, Instant at) implements AccountMailEvent {}

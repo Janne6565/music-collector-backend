@@ -54,6 +54,17 @@ public class PasswordResetService {
             log.debug("Reset requested for an address with no account");
             return;
         }
+        // An unconfirmed address is one nobody has shown they can read, and mailing a
+        // password reset to it would hand the account to whoever is actually there. This is
+        // the first of the three things being unconfirmed costs (design 21f), and the
+        // sign-in screen says so up front rather than leaving it to be discovered here --
+        // silence is required at this endpoint, so it cannot be the place that explains.
+        //
+        // Accounts that predate confirmation were stamped by V27 and are unaffected.
+        if (user.getEmailVerifiedAt() == null) {
+            log.debug("Reset requested for an unconfirmed address on user {}", user.getId());
+            return;
+        }
 
         String token = OneTimeToken.issue();
 

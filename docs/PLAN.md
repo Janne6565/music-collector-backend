@@ -591,6 +591,77 @@ exists so that the flow lands in the app the day those are configured.
 build talking to a server that predates the field would otherwise read `false` and nag
 about a confirmation that server cannot send.
 
+## Verification, drawn out (turn 21)
+
+The flow around what V26 shipped. Seven boards, and the one that mattered most decided
+nothing new: **nothing in the app is gated on confirming** (21f). Sync held back until a
+mailbox answers turns a mail-delivery problem into a data-loss risk on the one device
+holding the collection, lands hardest on the people least able to fix it, and buys nothing —
+an unconfirmed address is not a security problem for a private shelf list.
+
+What being unconfirmed is allowed to cost is confined to the mailbox, and that is the test
+any future gate has to pass:
+
+1. **No password reset.** `PasswordResetService` now refuses silently for an unconfirmed
+   address — mailing a reset to a mailbox nobody has shown they can read hands the account
+   to whoever is actually there. It stays *silent*, so that endpoint can never be the place
+   that explains; the sign-in screen says it up front instead.
+2. **The e-mail channel is inert.** Nothing that would arrive by mail has anywhere to go.
+3. Deliberately **not** built: 21f's third cost, "friends by e-mail only matches confirmed
+   addresses". Friend search is handle-only by design (turn 15), so there is no lookup by
+   address to defend. The board describes a defence for a feature that does not exist.
+
+**V27 is a grandfather clause, not a proof.** Every account made before V26 has no
+`email_verified_at`, purely because nobody was ever asked — and gating resets on it would
+silently take away something that worked yesterday, which is the exact failure 21f rejects.
+So those addresses are recorded as accepted-as-given. Every account made since has to
+confirm. Placeholder addresses are left alone: there is nothing to accept about a mailbox
+that does not exist.
+
+**Verification speaks in exactly two places** (21a): a strip on the library, once per
+device, and one row on Account. It is banned from the grid on any later visit, from the tab
+bar, from any modal, and from the add flow. A person with no account has none of the five
+states — a sixth called "no account" would imply the other five are a ladder to climb.
+
+**Pressing the button twice is answered by a countdown, not a duplicate.** Inside 60
+seconds the server sends nothing and returns the seconds left; issuing a link always retires
+the outstanding one, so two are never live and the older mail is never the one that works.
+The row reads its state from `GET /auth/confirm-email` rather than remembering its own last
+press, because "link sent, good for 24 hours" has to survive a reload.
+
+**The token moved into the path** — `/confirm/<token>`, not `?token=`. That is what the
+"arrived cut short" state is about: some mail clients wrap a long line and drop the rest, so
+a token shorter than 43 characters is a truncation the page can name instead of a link it
+has to call dead. The check is client-side in both apps, which is one integer duplicated
+rather than a round trip that would burn a rate limit to learn what we already know.
+
+### Changing the address (21g)
+
+The rule the whole flow hangs on: **the old address keeps working — signing in, resets,
+everything — until the new one answers**, so a typo cannot lock anybody out. The account is
+not un-confirmed meanwhile; it is confirmed at the old address and pending at the new, which
+is why starting a change never costs the recovery you already had.
+
+It rides on `email_verifications` (V28) rather than a table of its own, because a change *is*
+a confirmation with somewhere else to put the answer: a row with `new_email` moves the
+account when redeemed, a row without it confirms what is already there.
+
+**The old mailbox gets the undo, and it outlives the change by a day.** An undo that expired
+with the link could simply be waited out by whoever was at the keyboard. Cancelling puts the
+address back *and* bumps `token_version`: a hijack undone that leaves the hijacker signed in
+has been undone in name only. Calling a change off from inside the app clears the undo with
+it — there is nothing left to reverse, and a live cancel link would sign every device out
+over a change that never happened.
+
+**Changing away from an unconfirmed address warns nobody.** That is the common case — a typo
+— and there is no one at the old mailbox to defend, because nothing was ever shown to be
+there.
+
+The password is asked for so a stray session cannot walk off with the account. An account
+made through a provider has none, so `UserDto.hasPassword` tells the screen not to show a
+field nothing could ever be typed into, and the notice to the old address is what covers the
+gap.
+
 ### Open
 
 **The mails are English.** The app is bilingual and the legal documents are binding in German,

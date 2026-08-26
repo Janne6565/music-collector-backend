@@ -173,7 +173,8 @@ public class AuthService {
                 user.getEmail(),
                 user.getDisplayName(),
                 user.getCreatedAt(),
-                user.getEmailVerifiedAt() != null);
+                user.getEmailVerifiedAt() != null,
+                user.getPasswordHash() != null);
     }
 
     private Session issue(UserEntity user, boolean remember) {

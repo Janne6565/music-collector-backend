@@ -63,12 +63,64 @@ public class AccountMailer {
                         .paragraph(("One click and %s is confirmed. After that a password reset can find its way "
                                         + "back to you, and we can reach you if a sign-in ever needs checking.")
                                 .formatted(recipient))
-                        .action("Confirm this address", template.publicUrl() + "/confirm?token=" + token)
+                        .action("Confirm this address", template.publicUrl() + "/confirm/" + token)
                         .note("The link expires in 24 hours. If it runs out, ask for a new one on your Account "
                                 + "screen. Your collection, wishlist and photos sync either way — confirming "
                                 + "protects the account rather than unlocking it.")
                         .reason("You are receiving this because this address was entered for a Music Collector "
                                 + "account.")
+                        .build());
+    }
+
+    /**
+     * The same link, for an address the account is moving to (design 21g).
+     *
+     * <p>It says what the old address is still doing, because the one thing somebody worries
+     * about mid-change is whether they have just locked themselves out.
+     */
+    public void confirmNewAddress(String recipient, String token) {
+        send(
+                recipient,
+                MailContent.builder("Confirm your new e-mail address", "Confirm your new address")
+                        .paragraph(("Somebody asked to move a Music Collector account to %s. One click and it is "
+                                        + "yours — until then the old address goes on working, so nothing is lost "
+                                        + "if this was not you.")
+                                .formatted(recipient))
+                        .action("Confirm this address", template.publicUrl() + "/confirm/" + token)
+                        .note("The link expires in 24 hours, and the change lapses on its own if nobody answers. "
+                                + "The address it is moving away from has been told, and can cancel it.")
+                        .reason("You are receiving this because a Music Collector account is being moved to this "
+                                + "address.")
+                        .build());
+    }
+
+    /**
+     * The notice to the address being moved away from (design 21g).
+     *
+     * <p>In the security family and shaped like one: no button, and the undo is a text link.
+     * It goes out when the change is <em>asked for</em>, not when it lands — if somebody else
+     * is at the keyboard, this mailbox is the only place left to say so, and by the time the
+     * change went through it would be too late to be a warning.
+     */
+    public void emailChangeStarted(String recipient, String newEmail, String cancelToken, Instant at) {
+        send(
+                recipient,
+                MailContent.builder("Your Music Collector address is being changed", "Your address is being changed")
+                        .paragraph(("Somebody asked to move this Music Collector account to %s. Nothing has happened "
+                                        + "yet: %s goes on signing you in, and goes on receiving resets, until the "
+                                        + "new address answers its own link.")
+                                .formatted(newEmail, recipient))
+                        .fact("Requested %s".formatted(STAMP.format(at)))
+                        .note(
+                                "If you didn’t ask for this",
+                                "Cancel it. That puts the account back on this address and signs out every device, "
+                                        + "including whoever asked. The link keeps working for a day after the "
+                                        + "change goes through, so it is not too late if you read this tomorrow.",
+                                "Cancel this change",
+                                template.publicUrl() + "/email/cancel/" + cancelToken,
+                                true)
+                        .reason("You are receiving this because a change was requested for this address. Security "
+                                + "notices cannot be switched off.")
                         .build());
     }
 

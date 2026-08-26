@@ -33,6 +33,11 @@ public class SecurityConfig {
             // Followed in whichever browser opened the mail, which is often not a signed-in
             // one. The token in the body is the whole proof.
             "/api/v1/auth/confirm-email",
+            // Asked from the browser that landed on a dead link with no session (21d).
+            "/api/v1/auth/confirm-email/request",
+            // The undo in the notice to an old address. It has to work from a mailbox that
+            // can no longer sign in, which is the whole point of it.
+            "/api/v1/auth/email-change/cancel",
             "/api/v1/auth/providers",
             "/api/v1/auth/oauth/**",
             // Profiles are open for the same reason the metadata proxy is: a public shelf

@@ -1,12 +1,16 @@
 package com.musiccollector.controller.v1.schema;
 
+import com.musiccollector.model.action.CancelEmailChangeRequest;
+import com.musiccollector.model.action.ChangeEmailRequest;
 import com.musiccollector.model.action.ConfirmEmailRequest;
 import com.musiccollector.model.action.ForgotPasswordRequest;
+import com.musiccollector.model.action.RequestEmailConfirmationRequest;
 import com.musiccollector.model.action.LoginRequest;
 import com.musiccollector.model.action.RegisterRequest;
 import com.musiccollector.model.action.ResetPasswordRequest;
 import com.musiccollector.model.action.UpdateProfileRequest;
 import com.musiccollector.model.core.SessionDto;
+import com.musiccollector.model.core.EmailConfirmationDto;
 import com.musiccollector.model.core.UserDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -87,23 +91,78 @@ public interface AuthApi {
 
     @PostMapping("/confirm-email")
     @Operation(
-            summary = "Redeem an e-mail confirmation link",
+            summary = "Redeem a confirmation link",
             description = "Open, because the link is followed in whichever browser opened the mail, "
-                    + "which is not necessarily one that is signed in. The token is the proof.")
+                    + "which is not necessarily one that is signed in. The token is the proof. "
+                    + "A token issued for an address change moves the account instead.")
     @ApiResponse(responseCode = "200", description = "The account, now confirmed")
     @ApiResponse(responseCode = "400", description = "The link is expired, used, or not valid")
+    @ApiResponse(responseCode = "409", description = "The new address was claimed while the link waited")
     @ApiResponse(responseCode = "429", description = "Too many attempts")
     ResponseEntity<UserDto> confirmEmail(@Valid @RequestBody ConfirmEmailRequest request);
+
+    @GetMapping("/confirm-email")
+    @Operation(
+            summary = "Whether the address is confirmed, and what link is outstanding",
+            description = "What the account row draws. It survives a reload, which a client that only "
+                    + "remembered its own last button press would not.")
+    @ApiResponse(responseCode = "200", description = "The state of the address on this account")
+    @ApiResponse(responseCode = "401", description = "Not signed in")
+    ResponseEntity<EmailConfirmationDto> emailConfirmation();
 
     @PostMapping("/confirm-email/resend")
     @Operation(
             summary = "Send a fresh confirmation link",
-            description = "Answers 204 whether or not there was anything to send -- an address that is "
-                    + "already confirmed is not an error, it is the state the caller wanted.")
-    @ApiResponse(responseCode = "204", description = "Handled")
+            description = "Silent whether or not there was anything to send -- already confirmed is the "
+                    + "state the caller wanted, not an error. Inside the first minute nothing is sent "
+                    + "and the answer carries the seconds left instead; issuing a link always retires "
+                    + "the previous one, so two are never live at once.")
+    @ApiResponse(responseCode = "200", description = "The state of the address, including any countdown")
     @ApiResponse(responseCode = "401", description = "Not signed in")
     @ApiResponse(responseCode = "429", description = "Too many attempts")
-    ResponseEntity<Void> resendEmailConfirmation();
+    ResponseEntity<EmailConfirmationDto> resendEmailConfirmation();
+
+    @PostMapping("/confirm-email/request")
+    @Operation(
+            summary = "Send a confirmation link to an address, with no session",
+            description = "For the browser that landed on a dead link and is not signed in. Always "
+                    + "answers 204 -- an address with no account and one already confirmed answer the "
+                    + "same, or this becomes a way to find out who is registered.")
+    @ApiResponse(responseCode = "204", description = "Handled")
+    @ApiResponse(responseCode = "429", description = "Too many attempts")
+    ResponseEntity<Void> requestEmailConfirmation(@Valid @RequestBody RequestEmailConfirmationRequest request);
+
+    @PostMapping("/email-change")
+    @Operation(
+            summary = "Start moving the account to a different address",
+            description = "Nothing about the account changes here. The old address goes on signing you in "
+                    + "and receiving resets until the new one answers, so a typo cannot lock anybody out. "
+                    + "The password is asked for so that a stray session cannot walk off with the account; "
+                    + "an account made through a provider has none and is not asked.")
+    @ApiResponse(responseCode = "200", description = "The change is waiting on the new address")
+    @ApiResponse(responseCode = "401", description = "Not signed in, or the password is wrong")
+    @ApiResponse(responseCode = "409", description = "That address already has an account")
+    ResponseEntity<EmailConfirmationDto> changeEmail(@Valid @RequestBody ChangeEmailRequest request);
+
+    @DeleteMapping("/email-change")
+    @Operation(
+            summary = "Call off a change that has not landed yet",
+            description = "The Cancel on the account row. Undoing one that has already landed is "
+                    + "/email-change/cancel, which works from the old mailbox without a session.")
+    @ApiResponse(responseCode = "200", description = "The state of the address, with nothing pending")
+    @ApiResponse(responseCode = "401", description = "Not signed in")
+    ResponseEntity<EmailConfirmationDto> cancelEmailChange();
+
+    @PostMapping("/email-change/cancel")
+    @Operation(
+            summary = "Undo a change from the link in the notice",
+            description = "Open, and deliberately outlives the change by a day: it is the only defence "
+                    + "if somebody else is at the keyboard, and it has to work from a mailbox that can "
+                    + "no longer sign in. Undoing signs every device out.")
+    @ApiResponse(responseCode = "204", description = "The account is back on the old address")
+    @ApiResponse(responseCode = "400", description = "The link is expired, used, or not valid")
+    @ApiResponse(responseCode = "429", description = "Too many attempts")
+    ResponseEntity<Void> cancelEmailChangeByToken(@Valid @RequestBody CancelEmailChangeRequest request);
 
     @GetMapping("/me")
     @Operation(summary = "The signed-in account")

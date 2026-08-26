@@ -37,6 +37,10 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private static final String CONFIRM = "/api/v1/auth/confirm-email";
     /** Sends mail. Signed in, so the quota is a brake on a stuck client, not on an attacker. */
     private static final String RESEND = "/api/v1/auth/confirm-email/resend";
+    /** Open, and another token to guess. */
+    private static final String CANCEL_CHANGE = "/api/v1/auth/email-change/cancel";
+    /** Open, and sends mail to an address the caller chose. */
+    private static final String REQUEST_CONFIRMATION = "/api/v1/auth/confirm-email/request";
 
     private final Cache<String, Bucket> buckets =
             Caffeine.newBuilder().maximumSize(50_000).expireAfterAccess(Duration.ofMinutes(30)).build();
@@ -53,7 +57,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
                 || LOGIN.equals(path)
                 || FORGOT.equals(path)
                 || CONFIRM.equals(path)
-                || RESEND.equals(path));
+                || RESEND.equals(path)
+                || CANCEL_CHANGE.equals(path)
+                || REQUEST_CONFIRMATION.equals(path));
     }
 
     @Override

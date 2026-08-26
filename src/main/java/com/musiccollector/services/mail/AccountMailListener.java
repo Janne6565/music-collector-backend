@@ -39,6 +39,9 @@ public class AccountMailListener {
         switch (event) {
             case AccountMailEvent.PasswordResetRequested e -> mailer.passwordReset(e.recipient(), e.token());
             case AccountMailEvent.EmailConfirmationRequested e -> mailer.confirmEmail(e.recipient(), e.token());
+            case AccountMailEvent.EmailChangeRequested e -> mailer.confirmNewAddress(e.recipient(), e.token());
+            case AccountMailEvent.EmailChangeStarted e ->
+                mailer.emailChangeStarted(e.recipient(), e.newEmail(), e.cancelToken(), e.at());
             case AccountMailEvent.PasswordChanged e -> mailer.passwordChanged(e.recipient(), e.at());
             case AccountMailEvent.SignInMethodLinked e ->
                 mailer.signInMethodLinked(e.recipient(), e.provider(), e.at());

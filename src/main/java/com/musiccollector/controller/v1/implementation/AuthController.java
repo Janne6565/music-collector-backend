@@ -1,12 +1,16 @@
 package com.musiccollector.controller.v1.implementation;
 
 import com.musiccollector.controller.v1.schema.AuthApi;
+import com.musiccollector.model.action.CancelEmailChangeRequest;
+import com.musiccollector.model.action.ChangeEmailRequest;
 import com.musiccollector.model.action.ConfirmEmailRequest;
 import com.musiccollector.model.action.ForgotPasswordRequest;
+import com.musiccollector.model.action.RequestEmailConfirmationRequest;
 import com.musiccollector.model.action.LoginRequest;
 import com.musiccollector.model.action.RegisterRequest;
 import com.musiccollector.model.action.ResetPasswordRequest;
 import com.musiccollector.model.action.UpdateProfileRequest;
+import com.musiccollector.model.core.EmailConfirmationDto;
 import com.musiccollector.model.core.SessionDto;
 import com.musiccollector.model.core.TokenMode;
 import com.musiccollector.model.core.UserDto;
@@ -70,8 +74,35 @@ public class AuthController implements AuthApi {
     }
 
     @Override
-    public ResponseEntity<Void> resendEmailConfirmation() {
-        emailVerificationService.request(currentUser.require());
+    public ResponseEntity<EmailConfirmationDto> emailConfirmation() {
+        return ResponseEntity.ok(emailVerificationService.status(currentUser.require()));
+    }
+
+    @Override
+    public ResponseEntity<EmailConfirmationDto> resendEmailConfirmation() {
+        return ResponseEntity.ok(emailVerificationService.request(currentUser.require()));
+    }
+
+    @Override
+    public ResponseEntity<Void> requestEmailConfirmation(RequestEmailConfirmationRequest request) {
+        emailVerificationService.requestFor(request.email());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<EmailConfirmationDto> changeEmail(ChangeEmailRequest request) {
+        return ResponseEntity.ok(
+                emailVerificationService.requestChange(currentUser.require(), request.email(), request.password()));
+    }
+
+    @Override
+    public ResponseEntity<EmailConfirmationDto> cancelEmailChange() {
+        return ResponseEntity.ok(emailVerificationService.cancelPendingChange(currentUser.require()));
+    }
+
+    @Override
+    public ResponseEntity<Void> cancelEmailChangeByToken(CancelEmailChangeRequest request) {
+        emailVerificationService.cancelChange(request.token());
         return ResponseEntity.noContent().build();
     }
 

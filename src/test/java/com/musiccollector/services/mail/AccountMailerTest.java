@@ -44,7 +44,7 @@ class AccountMailerTest {
     void theConfirmationLinkPointsAtTheConfirmScreen() {
         mailer().confirmEmail("jonas@example.test", "tok-123");
 
-        assertThat(htmlSentTo("jonas@example.test")).contains("https://music.example/confirm?token=tok-123");
+        assertThat(htmlSentTo("jonas@example.test")).contains("https://music.example/confirm/tok-123");
     }
 
     @Test

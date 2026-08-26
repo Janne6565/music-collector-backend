@@ -47,6 +47,9 @@ class PasswordResetServiceTest {
         user.setEmail("jonas@example.test");
         user.setPasswordHash("old-hash");
         user.setTokenVersion(3);
+        // Confirmed, because an unconfirmed address gets no reset at all -- see the test
+        // below. Accounts that predate confirmation were stamped by V27.
+        user.setEmailVerifiedAt(Instant.now());
         user.setCreatedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
         return user;
@@ -79,6 +82,21 @@ class PasswordResetServiceTest {
         when(userRepository.findByEmailIgnoreCase(anyString())).thenReturn(Optional.empty());
 
         service.request("nobody@example.test");
+
+        verify(events, never()).publishEvent(any(Object.class));
+        verify(resetRepository, never()).save(any());
+    }
+
+    @Test
+    void staysSilentForAnUnconfirmedAddress() {
+        // Mailing a reset to an address nobody has shown they can read hands the account to
+        // whoever is actually there. Silent rather than refused, for the same reason as the
+        // unknown-address case: a different answer says which addresses are registered.
+        UserEntity user = user();
+        user.setEmailVerifiedAt(null);
+        when(userRepository.findByEmailIgnoreCase("jonas@example.test")).thenReturn(Optional.of(user));
+
+        service.request("jonas@example.test");
 
         verify(events, never()).publishEvent(any(Object.class));
         verify(resetRepository, never()).save(any());
