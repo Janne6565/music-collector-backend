@@ -11,6 +11,7 @@ import com.musiccollector.model.core.SyncWishDto;
 import com.musiccollector.repository.OAuthIdentityRepository;
 import com.musiccollector.repository.UserRepository;
 import com.musiccollector.services.auth.ConsentService;
+import com.musiccollector.services.notifications.NotificationPreferenceService;
 import com.musiccollector.services.social.FriendshipService;
 import com.musiccollector.services.social.SharingService;
 import com.musiccollector.services.sync.SyncService;
@@ -55,6 +56,7 @@ public class AccountExportService {
     private final SharingService sharingService;
     private final FriendshipService friendshipService;
     private final OAuthIdentityRepository oauthIdentityRepository;
+    private final NotificationPreferenceService notificationPreferenceService;
 
     @Transactional(readOnly = true)
     public AccountExportDto export(UserEntity user) {
@@ -87,6 +89,10 @@ public class AccountExportService {
                         user.getCreatedAt()),
                 consentService.list(user.getId()),
                 sharingService.read(user.getId()),
+                // Defaults included: a preference nobody ever changed is still a fact held
+                // about them, and an export that only listed the edited rows would read as
+                // though the rest had no answer.
+                notificationPreferenceService.forUser(user).categories(),
                 copies,
                 wishes,
                 photos,

@@ -17,6 +17,8 @@ import java.util.List;
  * @param account     who the account is, as the server knows it
  * @param consents    what was agreed to and when, newest first
  * @param sharing     the visibility answers, so an export shows what was public at the time
+ * @param notifications what may reach this account outside the app, defaults included --
+ *                    a preference nobody ever changed is still a fact held about them
  * @param friends     the other people this account is connected to, by handle
  * @param providers   which sign-in providers are linked, never their tokens
  */
@@ -25,6 +27,7 @@ public record AccountExportDto(
         AccountDto account,
         List<ConsentDto> consents,
         SharingSettingsDto sharing,
+        List<NotificationPreferenceDto> notifications,
         List<SyncCopyDto> copies,
         List<SyncWishDto> wishes,
         List<SyncPhotoDto> photos,
