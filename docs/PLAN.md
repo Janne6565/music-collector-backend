@@ -571,6 +571,26 @@ address when it links one to an account that exists. Withheld addresses get the
 `@no-email.invalid` placeholder and are never posted to; the listener drops every event
 addressed to one.
 
+### On the phone
+
+The Account screen carries the same row and resend button, and `musiccollector://confirm`
+is a real screen. What it is *not* is where the link lands: the mail carries an https URL,
+and without universal links iOS opens Safari, so the ordinary path on a phone is the web
+confirm page. That is fine — the confirmation is a server fact either way — but it leaves
+the app holding an account it believes is unconfirmed, so the Account screen re-reads the
+account **on focus, and only while that would change something**. The dependency is the
+boolean, never the account object: depending on the account would re-run the effect on the
+very dispatch it makes.
+
+Turning the mail link into one that opens the app is deployment work, not app work — an
+`apple-app-site-association` served from `music.jannekeipert.de` and an `assetlinks.json`
+for Android, plus `associatedDomains` / `intentFilters` in `app.json`. Not done. The screen
+exists so that the flow lands in the app the day those are configured.
+
+`AccountUser.emailVerified` is **optional** in the hand-written mobile client on purpose: a
+build talking to a server that predates the field would otherwise read `false` and nag
+about a confirmation that server cannot send.
+
 ### Open
 
 **The mails are English.** The app is bilingual and the legal documents are binding in German,
