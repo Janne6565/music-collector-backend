@@ -2,8 +2,11 @@ package com.musiccollector.controller;
 
 import com.musiccollector.controller.v1.implementation.AuthController;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.annotation.Order;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -24,8 +27,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class GlobalExceptionHandlerTest {
 
+    /**
+     * Stands in for the advice {@code spring.mvc.problemdetails.enabled} registers.
+     *
+     * <p>It is here because leaving it out is what let a broken build pass: Boot's handler
+     * sits at order 0 and answers validation failures too, so an unordered advice of ours
+     * is simply never reached and the stock "Invalid request content." goes out no matter
+     * what the class under test says. A test without a competitor tests the wrong app.
+     */
+    @Order(0)
+    @RestControllerAdvice
+    static class BootsOwnAdvice extends ResponseEntityExceptionHandler {}
+
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new AuthController(null, null, null, null))
-            .setControllerAdvice(new GlobalExceptionHandler())
+            .setControllerAdvice(new BootsOwnAdvice(), new GlobalExceptionHandler())
             .build();
 
     private static final String CONSENTED = "\"acceptedTerms\":true,\"confirmedAge\":true";

@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -16,6 +18,16 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
+/**
+ * Ordered ahead of Spring Boot's own advice on purpose.
+ *
+ * <p>{@code spring.mvc.problemdetails.enabled} registers a handler at order 0 that answers
+ * every framework-raised error, validation included. An unordered {@code @RestControllerAdvice}
+ * sits at {@link Ordered#LOWEST_PRECEDENCE}, so without this the handlers below are never
+ * consulted for the exceptions Boot also knows about — and the stock "Invalid request
+ * content." goes out regardless of what is written here.
+ */
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
