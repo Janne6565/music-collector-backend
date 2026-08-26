@@ -2,6 +2,7 @@ package com.musiccollector.services.metadata;
 
 import com.musiccollector.client.CoverArtClient;
 import com.musiccollector.client.DiscogsClient;
+import com.musiccollector.client.DiscogsResponses;
 import com.musiccollector.client.MusicBrainzClient;
 import com.musiccollector.entity.ReleaseEntity;
 import com.musiccollector.entity.ReleaseGroupEntity;
@@ -12,6 +13,7 @@ import com.musiccollector.repository.ReleaseGroupRepository;
 import com.musiccollector.repository.ReleaseRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,6 +23,7 @@ import org.mockito.quality.Strictness;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -124,6 +127,76 @@ class AlbumCoversTest {
                 .containsExactly(new AlbumCoverDto(
                         MB_ALBUM,
                         "https://coverartarchive.org/release-group/0f2d5a1e-4a1e-4e7a-9c1e-2f0d4b6a8c11/front-500"));
+    }
+
+    @Test
+    void asksDiscogsForAnAlbumNoMirroredPressingCanDescribe() {
+        // The gap an imported collection falls into: the wish names an album this
+        // deployment never searched for, so no pressing of it is mirrored. A MusicBrainz
+        // album still resolved through the archive; a Discogs one had nowhere to go.
+        mirror(List.of(), List.of());
+        when(discogsClient.servesImages()).thenReturn(true);
+        when(discogsClient.master(1283634L)).thenReturn(Optional.of(
+                new DiscogsResponses.MasterResponse(
+                        1283634L,
+                        "One More Light Live",
+                        List.of(new DiscogsResponses.ArtistCredit("Linkin Park")),
+                        List.of())));
+        when(discogsClient.coverOf(any())).thenReturn(Optional.of("https://img.discogs/master.jpg"));
+        when(releaseGroupRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        assertThat(service.albumCovers(List.of(DISCOGS_ALBUM)))
+                .containsExactly(new AlbumCoverDto(DISCOGS_ALBUM, "https://img.discogs/master.jpg"));
+
+        // Remembered against the album, so the next reader pays nothing.
+        ArgumentCaptor<ReleaseGroupEntity> saved = ArgumentCaptor.forClass(ReleaseGroupEntity.class);
+        verify(releaseGroupRepository).save(saved.capture());
+        assertThat(saved.getValue().getCoverArtUrl()).isEqualTo("https://img.discogs/master.jpg");
+        assertThat(saved.getValue().getCoverFetchedAt()).isNotNull();
+    }
+
+    @Test
+    void neverAsksTwiceAboutAnAlbumWithNoCover() {
+        // "Asked, and there is none" has to be tellable from "never asked", or every
+        // reader of an artless album goes upstream again forever.
+        ReleaseGroupEntity album = group(DISCOGS_ALBUM);
+        album.setCoverFetchedAt(Instant.now());
+        album.setCoverArtUrl(null);
+        mirror(List.of(album), List.of());
+
+        assertThat(service.albumCovers(List.of(DISCOGS_ALBUM)))
+                .containsExactly(new AlbumCoverDto(DISCOGS_ALBUM, null));
+        verify(discogsClient, never()).master(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void goesUpstreamForAtMostAHandfulOfAlbumsPerRequest() {
+        // An open endpoint in front of a catalogue paced at tens of requests a minute.
+        // A page of unknown albums must not become a page of blocking calls.
+        mirror(List.of(), List.of());
+        when(discogsClient.servesImages()).thenReturn(true);
+        when(discogsClient.master(org.mockito.ArgumentMatchers.anyLong())).thenReturn(Optional.empty());
+
+        List<String> many = new java.util.ArrayList<>();
+        for (int i = 1; i <= 40; i += 1) {
+            many.add("discogs:" + (1000 + i));
+        }
+        assertThat(service.albumCovers(many)).hasSize(40);
+
+        verify(discogsClient, org.mockito.Mockito.times(8))
+                .master(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void asksNothingUpstreamForAPressingWithNoMaster() {
+        // "discogs:release-<id>" is the album ref for a pressing Discogs lists no master
+        // for. There is no master to ask about.
+        mirror(List.of(), List.of());
+        when(discogsClient.servesImages()).thenReturn(true);
+
+        assertThat(service.albumCovers(List.of("discogs:release-556677")))
+                .containsExactly(new AlbumCoverDto("discogs:release-556677", null));
+        verify(discogsClient, never()).master(org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test

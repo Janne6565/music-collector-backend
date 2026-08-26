@@ -63,6 +63,18 @@ public final class DiscogsResponses {
     public record ArtistImage(String type, String uri, String uri150) {}
 
     /**
+     * One album, as Discogs calls a master.
+     *
+     * <p>Only the fields needed to give an album a sleeve and a name. A wish points at a
+     * master rather than a pressing, and this is the one way to ask about it by id --
+     * everything else Discogs offers is a search.
+     */
+    public record MasterResponse(Long id, String title, List<ArtistCredit> artists, List<ArtistImage> images) {}
+
+    /** Discogs credits an album to a list; the first entry is the one on the spine. */
+    public record ArtistCredit(String name) {}
+
+    /**
      * A format and what kind of one it is.
      *
      * <p>{@code name} is the medium ("Vinyl", "CD", "Cassette", "File"); {@code

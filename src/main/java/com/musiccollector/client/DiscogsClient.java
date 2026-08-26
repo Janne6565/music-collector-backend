@@ -105,6 +105,41 @@ public class DiscogsClient {
     }
 
     /**
+     * One album by its master id, for the sleeve.
+     *
+     * <p>The Discogs counterpart of the Cover Art Archive URL a MusicBrainz album gets for
+     * free. A wishlist entry names an album, artwork belongs to a pressing, and the mirror
+     * can only answer for albums it happens to hold a pressing of -- so an album that
+     * arrived by any route other than searching on this deployment had no sleeve and no way
+     * to ever get one. This is that way.
+     *
+     * <p>Empty rather than a throw for a master Discogs does not have: that is an answer
+     * about the album, not a failure of the request.
+     */
+    public Optional<DiscogsResponses.MasterResponse> master(long masterId) {
+        if (!properties.authenticated()) {
+            return Optional.empty();
+        }
+        pacer.awaitSlot();
+        try {
+            return Optional.ofNullable(restClient
+                    .get()
+                    .uri(uri -> uri.path("/masters/{id}").build(masterId))
+                    .retrieve()
+                    .body(DiscogsResponses.MasterResponse.class));
+        } catch (HttpClientErrorException.NotFound e) {
+            return Optional.empty();
+        } catch (RestClientException e) {
+            throw new UpstreamUnavailableException("Discogs", e);
+        }
+    }
+
+    /** The sleeve to draw for an album, chosen the same way an artist's portrait is. */
+    public Optional<String> coverOf(DiscogsResponses.MasterResponse master) {
+        return master == null ? Optional.empty() : preferredImage(master.images());
+    }
+
+    /**
      * The one picture worth putting in a circle, out of everything Discogs holds.
      *
      * <p>Package-private for the test. Prefers the thumbnail of the primary image, falls

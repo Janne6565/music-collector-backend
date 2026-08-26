@@ -40,4 +40,17 @@ public class ReleaseGroupEntity {
 
     @Column(name = "fetched_at", nullable = false)
     private Instant fetchedAt;
+
+    /**
+     * The album's own sleeve, for albums no mirrored pressing can supply one for.
+     *
+     * Null with {@link #coverFetchedAt} set means asked and there was nothing -- which is
+     * a different fact from never having asked, and the only thing stopping every request
+     * for an artless album going back upstream forever.
+     */
+    @Column(name = "cover_art_url")
+    private String coverArtUrl;
+
+    @Column(name = "cover_fetched_at")
+    private Instant coverFetchedAt;
 }

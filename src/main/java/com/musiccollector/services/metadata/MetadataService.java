@@ -278,7 +278,7 @@ public class MetadataService {
      * per-album image, so an unmirrored Discogs album answers null and the client draws its
      * format placeholder — which is the same thing it does when the URL 404s.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public List<AlbumCoverDto> albumCovers(Collection<String> albumIds) {
         // Asked-for id -> the normalised reference it is stored under. Ordered, because the
         // response mirrors the request, and de-duplicated: a client may ask twice.
@@ -296,14 +296,111 @@ public class MetadataService {
         }
         Map<UUID, String> mirrored = mirroredCovers(groups.values());
 
+        // Bounded per request: a page of a hundred unknown albums must not become a hundred
+        // paced upstream calls with somebody waiting on the response. The rest come back
+        // null and are resolved by the next request, which is what the endpoint did for
+        // every album before any of them could be resolved at all.
+        int[] budget = {UPSTREAM_ALBUM_COVERS_PER_REQUEST};
         return wanted.entrySet().stream()
                 .map(entry -> {
                     ReleaseGroupEntity group = groups.get(entry.getValue());
                     String cover = group == null ? null : mirrored.get(group.getId());
                     return new AlbumCoverDto(
-                            entry.getKey(), cover != null ? cover : archiveCover(entry.getValue()));
+                            entry.getKey(),
+                            cover != null ? cover : albumOwnCover(entry.getValue(), group, budget));
                 })
                 .toList();
+    }
+
+    /**
+     * How many albums one request may go upstream for.
+     *
+     * Small on purpose. This is an open, unauthenticated endpoint in front of a catalogue
+     * paced at tens of requests a minute, and every one of these blocks the response. A
+     * shelf heals over a few page loads instead of one slow one.
+     */
+    private static final int UPSTREAM_ALBUM_COVERS_PER_REQUEST = 8;
+
+    /**
+     * The album's own sleeve, when no pressing the mirror holds can give it one.
+     *
+     * A MusicBrainz album has always had this: the Cover Art Archive builds an address
+     * from the group id, so it costs nothing and cannot fail. A Discogs album had nothing
+     * at all -- which is why an imported collection showed silhouettes on exactly the
+     * wishes whose albums this deployment had never searched for, with no way to heal.
+     */
+    private String albumOwnCover(String albumRef, ReleaseGroupEntity group, int[] budget) {
+        ExternalRef ref = ExternalRef.parse(albumRef);
+        if (ref.source() == ReleaseSource.MUSICBRAINZ) {
+            return archiveCover(albumRef);
+        }
+        if (ref.source() != ReleaseSource.DISCOGS) {
+            return null;
+        }
+        // Asked once, remembered either way -- including the answer "there is none".
+        if (group != null && group.getCoverFetchedAt() != null) {
+            return group.getCoverArtUrl();
+        }
+        if (budget[0] <= 0 || !discogsClient.servesImages()) {
+            return null;
+        }
+        budget[0] -= 1;
+        return discogsAlbumCover(ref, group);
+    }
+
+    /** Fetches a Discogs master's sleeve and remembers it against the album. */
+    private String discogsAlbumCover(ExternalRef ref, ReleaseGroupEntity group) {
+        long masterId;
+        try {
+            // "release-<id>" is what an album ref falls back to for a pressing with no
+            // master. There is no master to ask about, so there is nothing to fetch.
+            masterId = Long.parseLong(ref.id());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+
+        DiscogsResponses.MasterResponse master;
+        try {
+            master = discogsClient.master(masterId).orElse(null);
+        } catch (UpstreamUnavailableException e) {
+            // Discogs is down or out of quota. Not remembered, so the next request retries.
+            log.debug("Could not reach Discogs for album {} ({})", ref, e.getMessage());
+            return null;
+        }
+
+        String cover = discogsClient.coverOf(master).orElse(null);
+
+        ReleaseGroupEntity entity = group == null ? adoptDiscogsAlbum(ref, master) : group;
+        if (entity == null) {
+            return cover;
+        }
+        entity.setCoverArtUrl(cover);
+        entity.setCoverFetchedAt(Instant.now());
+        releaseGroupRepository.save(entity);
+        return cover;
+    }
+
+    /**
+     * A row for an album the mirror has never held a pressing of.
+     *
+     * Created so the answer -- a sleeve, or the fact that there is none -- has somewhere to
+     * live. Null when Discogs could not name the album either, because a group row with no
+     * title is worse than no row.
+     */
+    private ReleaseGroupEntity adoptDiscogsAlbum(ExternalRef ref, DiscogsResponses.MasterResponse master) {
+        if (master == null || master.title() == null || master.title().isBlank()) {
+            return null;
+        }
+        ReleaseGroupEntity entity = new ReleaseGroupEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setExternalId(ref.toString());
+        entity.setTitle(master.title());
+        entity.setArtistName(
+                master.artists() == null || master.artists().isEmpty() || master.artists().getFirst().name() == null
+                        ? ""
+                        : master.artists().getFirst().name());
+        entity.setFetchedAt(Instant.now());
+        return entity;
     }
 
     /**
