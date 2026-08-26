@@ -9,8 +9,11 @@ import com.musiccollector.model.exception.FriendRequestNotFoundException;
 import com.musiccollector.model.exception.HandleRequiredException;
 import com.musiccollector.model.exception.ProfileNotFoundException;
 import com.musiccollector.model.exception.SelfFriendshipException;
+import com.musiccollector.repository.CopyRepository;
 import com.musiccollector.repository.FriendshipRepository;
 import com.musiccollector.repository.UserRepository;
+import com.musiccollector.services.notifications.PushEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +42,8 @@ public class FriendshipService {
 
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
+    private final CopyRepository copyRepository;
+    private final ApplicationEventPublisher events;
 
     /**
      * Ask somebody to be friends.
@@ -69,6 +74,15 @@ public class FriendshipService {
         friendship.setStatus(FriendshipStatus.PENDING);
         friendship.setCreatedAt(Instant.now());
         friendshipRepository.save(friendship);
+
+        // Board 22c's one surviving per-event push: it names a person and waits for an
+        // answer, which is the whole test it had to pass. Whether it actually buzzes is the
+        // addressee's grid and their devices' mutes to decide, not this service's.
+        events.publishEvent(new PushEvent.FriendRequested(
+                target.getId(),
+                viewer.getDisplayName() == null ? "@" + viewer.getHandle() : viewer.getDisplayName(),
+                viewer.getHandle(),
+                copyRepository.countVisible(viewer.getId())));
 
         log.debug("User {} asked to be friends with {}", viewer.getId(), target.getId());
         return friendship;

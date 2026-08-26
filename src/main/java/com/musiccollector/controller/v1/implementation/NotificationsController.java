@@ -1,10 +1,16 @@
 package com.musiccollector.controller.v1.implementation;
 
 import com.musiccollector.controller.v1.schema.NotificationsApi;
+import com.musiccollector.model.action.RegisterDeviceRequest;
 import com.musiccollector.model.action.UpdateNotificationPreferenceRequest;
+import com.musiccollector.model.core.NotificationDeviceDto;
 import com.musiccollector.model.core.NotificationPreferencesDto;
 import com.musiccollector.security.CurrentUser;
+import com.musiccollector.services.notifications.NotificationDeviceService;
 import com.musiccollector.services.notifications.NotificationPreferenceService;
+
+import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class NotificationsController implements NotificationsApi {
 
     private final NotificationPreferenceService preferenceService;
+    private final NotificationDeviceService deviceService;
     private final CurrentUser currentUser;
 
     @Override
@@ -25,5 +32,25 @@ public class NotificationsController implements NotificationsApi {
     public ResponseEntity<NotificationPreferencesDto> updatePreference(UpdateNotificationPreferenceRequest request) {
         return ResponseEntity.ok(preferenceService.update(
                 currentUser.require(), request.category(), request.mail(), request.push()));
+    }
+
+    @Override
+    public ResponseEntity<List<NotificationDeviceDto>> devices(String currentDeviceId) {
+        return ResponseEntity.ok(deviceService.list(currentUser.require(), currentDeviceId));
+    }
+
+    @Override
+    public ResponseEntity<List<NotificationDeviceDto>> registerDevice(RegisterDeviceRequest request) {
+        var user = currentUser.require();
+        deviceService.register(user, request.deviceId(), request.pushToken(), request.platform(), request.label());
+        return ResponseEntity.ok(deviceService.list(user, request.deviceId()));
+    }
+
+    @Override
+    public ResponseEntity<List<NotificationDeviceDto>> muteDevice(
+            UUID id, MuteDeviceRequest request, String currentDeviceId) {
+        var user = currentUser.require();
+        deviceService.setMuted(user, id, request.muted());
+        return ResponseEntity.ok(deviceService.list(user, currentDeviceId));
     }
 }

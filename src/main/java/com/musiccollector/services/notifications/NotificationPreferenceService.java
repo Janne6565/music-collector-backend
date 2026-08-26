@@ -42,10 +42,11 @@ public class NotificationPreferenceService {
     private static final Logger log = LoggerFactory.getLogger(NotificationPreferenceService.class);
 
     private final NotificationPreferenceRepository repository;
+    private final NotificationDeviceService deviceService;
 
     @Transactional(readOnly = true)
     public NotificationPreferencesDto forUser(UserEntity user) {
-        return describe(stored(user));
+        return describe(stored(user), deviceService.anyDevice(user));
     }
 
     /**
@@ -72,7 +73,7 @@ public class NotificationPreferenceService {
         repository.save(row);
 
         log.debug("Notification preference {} updated for user {}", category, user.getId());
-        return describe(current);
+        return describe(current, deviceService.anyDevice(user));
     }
 
     /** True when this category may go out by mail for this account. */
@@ -85,6 +86,13 @@ public class NotificationPreferenceService {
         return row == null ? category.mailByDefault() : row.isMail();
     }
 
+    /** True when this category may buzz for this account. The device's own mute is separate. */
+    @Transactional(readOnly = true)
+    public boolean pushEnabled(UserEntity user, NotificationCategory category) {
+        NotificationPreferenceEntity row = stored(user).get(category);
+        return row == null ? category.pushByDefault() : row.isPush();
+    }
+
     private Map<NotificationCategory, NotificationPreferenceEntity> stored(UserEntity user) {
         Map<NotificationCategory, NotificationPreferenceEntity> map = new EnumMap<>(NotificationCategory.class);
         for (NotificationPreferenceEntity row : repository.findAllByUserId(user.getId())) {
@@ -93,7 +101,8 @@ public class NotificationPreferenceService {
         return map;
     }
 
-    private NotificationPreferencesDto describe(Map<NotificationCategory, NotificationPreferenceEntity> stored) {
+    private NotificationPreferencesDto describe(
+            Map<NotificationCategory, NotificationPreferenceEntity> stored, boolean pushAvailable) {
         List<NotificationPreferenceDto> categories = java.util.Arrays.stream(NotificationCategory.values())
                 .map(category -> {
                     NotificationPreferenceEntity row = stored.get(category);
@@ -104,9 +113,9 @@ public class NotificationPreferenceService {
                     return new NotificationPreferenceDto(category, mail, push, category.mailLocked());
                 })
                 .toList();
-        // No push transport exists yet, so no device on any account could receive one. The
-        // column says so rather than offering switches that would quietly do nothing (22a).
-        // The stored choices survive regardless, which is the point of keeping them here.
-        return new NotificationPreferencesDto(categories, false);
+        // True once anything on this account could be buzzed at all. Until then the column
+        // says so rather than offering switches that would quietly do nothing (22a) -- and
+        // the stored choices survive either way, so nobody sets them twice.
+        return new NotificationPreferencesDto(categories, pushAvailable);
     }
 }

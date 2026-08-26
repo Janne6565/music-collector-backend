@@ -44,6 +44,13 @@ music-collector:
     # nothing can mail a real person from a laptop by accident.
     api-key: ${MC_MAIL_API_KEY:}
     public-url: ${MC_PUBLIC_URL:http://localhost:5173}
+  push:
+    # Expo's push service. It fans out to APNs and FCM on our behalf, so nothing here ever
+    # holds an Apple key -- EAS does, and the device's Expo token is what names it.
+    endpoint: ${MC_PUSH_ENDPOINT:https://exp.host/--/api/v2/push/send}
+    # Off by default, which is the local default for the same reason mail is: nothing should
+    # be able to buzz a real phone from a laptop by accident.
+    enabled: ${MC_PUSH_ENABLED:false}
   oauth:
     public-base-url: ${MC_PUBLIC_URL:http://localhost:5173}
     # Where the callback reopens the phone app. Matches the "scheme" in the mobile app.json;

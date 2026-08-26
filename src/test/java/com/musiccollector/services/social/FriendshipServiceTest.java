@@ -10,7 +10,9 @@ import com.musiccollector.model.exception.HandleRequiredException;
 import com.musiccollector.model.exception.ProfileNotFoundException;
 import com.musiccollector.model.exception.SelfFriendshipException;
 import com.musiccollector.repository.FriendshipRepository;
+import com.musiccollector.repository.CopyRepository;
 import com.musiccollector.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +44,8 @@ class FriendshipServiceTest {
 
     @Mock private FriendshipRepository friendshipRepository;
     @Mock private UserRepository userRepository;
+    @Mock private CopyRepository copyRepository;
+    @Mock private ApplicationEventPublisher events;
 
     @InjectMocks private FriendshipService service;
 

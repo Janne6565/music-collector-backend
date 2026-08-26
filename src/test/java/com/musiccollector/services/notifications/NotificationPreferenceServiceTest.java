@@ -29,13 +29,14 @@ import static org.mockito.Mockito.when;
 class NotificationPreferenceServiceTest {
 
     @Mock private NotificationPreferenceRepository repository;
+    @Mock private NotificationDeviceService deviceService;
 
     private NotificationPreferenceService service;
     private UserEntity user;
 
     @BeforeEach
     void setUp() {
-        service = new NotificationPreferenceService(repository);
+        service = new NotificationPreferenceService(repository, deviceService);
         user = new UserEntity();
         user.setId(UUID.randomUUID());
         user.setEmail("jonas@example.test");
@@ -100,9 +101,29 @@ class NotificationPreferenceServiceTest {
     }
 
     @Test
-    void theGridSaysPushHasNowhereToArrive() {
-        // There is no push transport yet, so the column reports that plainly rather than
-        // offering switches that would silently do nothing (22a). The choices persist.
+    void theGridSaysWhetherPushHasAnywhereToArrive() {
+        // With nothing registered the column reports that plainly rather than offering
+        // switches that would silently do nothing (22a). The stored choices persist either
+        // way, so nobody has to set them twice once a phone shows up.
+        when(deviceService.anyDevice(user)).thenReturn(false);
         assertThat(service.forUser(user).pushAvailable()).isFalse();
+
+        when(deviceService.anyDevice(user)).thenReturn(true);
+        assertThat(service.forUser(user).pushAvailable()).isTrue();
+    }
+
+    @Test
+    void pushEnabledReadsTheStoredChoiceAndFallsBackToTheDefault() {
+        // Board 22c killed the per-record activity push, so its default is off.
+        assertThat(service.pushEnabled(user, NotificationCategory.FRIEND_ACTIVITY)).isFalse();
+        assertThat(service.pushEnabled(user, NotificationCategory.FRIEND_REQUEST)).isTrue();
+
+        NotificationPreferenceEntity row = new NotificationPreferenceEntity();
+        row.setUserId(user.getId());
+        row.setCategory(NotificationCategory.FRIEND_REQUEST);
+        row.setPush(false);
+        when(repository.findAllByUserId(user.getId())).thenReturn(List.of(row));
+
+        assertThat(service.pushEnabled(user, NotificationCategory.FRIEND_REQUEST)).isFalse();
     }
 }
