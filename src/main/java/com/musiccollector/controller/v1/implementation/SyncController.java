@@ -31,6 +31,7 @@ public class SyncController implements SyncApi {
                         request.safeCopies(),
                         request.safeWishes(),
                         request.safePhotos(),
+                        request.safeReleases(),
                         request.origins()));
     }
 }

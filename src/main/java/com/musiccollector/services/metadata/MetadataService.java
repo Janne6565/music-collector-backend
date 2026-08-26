@@ -14,6 +14,7 @@ import com.musiccollector.model.core.AlbumDto;
 import com.musiccollector.model.core.ArtistDto;
 import com.musiccollector.model.core.ArtistImageDto;
 import com.musiccollector.model.core.ExternalRef;
+import com.musiccollector.model.core.Format;
 import com.musiccollector.model.core.ReleaseSource;
 import com.musiccollector.model.core.ReleaseDto;
 import com.musiccollector.model.exception.ReleaseNotFoundException;
@@ -384,6 +385,101 @@ public class MetadataService {
      * it, so the mirror is the right answer, and an id it does not hold is left out of the
      * response — the client keeps its placeholder and asks again on the next sync.
      */
+    /**
+     * Takes the catalogue rows a client already holds into the mirror.
+     *
+     * <p>The mirror is a cache with exactly one way in: somebody looked a release up through
+     * this proxy. That is a hole, because a copy can reach the server without its release
+     * ever doing so — an archive imported into a fresh deployment, or a collection built on
+     * a deployment this one is not. Those copies then name releases nothing can resolve, and
+     * for Discogs ids nothing ever will: there is no lookup by id for them at all. The shelf
+     * on every other device stays untitled for good.
+     *
+     * <p>So the device that made the copy hands over what it has. It is the only party that
+     * still holds it, and it costs no upstream quota.
+     *
+     * <p>Existing rows are left exactly as they are. What the mirror fetched itself is
+     * better than what a client echoes back — it carries the sampled palette and a probed
+     * cover — and this must never be a way for one account to rewrite what every account
+     * reads.
+     */
+    @Transactional
+    public int adoptFromClient(Collection<ReleaseDto> releases) {
+        if (releases == null || releases.isEmpty()) {
+            return 0;
+        }
+
+        Set<String> wanted = new LinkedHashSet<>();
+        Map<String, ReleaseDto> byRef = new LinkedHashMap<>();
+        for (ReleaseDto dto : releases) {
+            if (dto == null || dto.id() == null || dto.id().isBlank() || dto.id().startsWith("local:")) {
+                continue;
+            }
+            // A hand-entered release is derived from its copy and belongs to nobody's cache.
+            String ref = ExternalRef.parse(dto.id()).toString();
+            if (byRef.putIfAbsent(ref, dto) == null) {
+                wanted.add(ref);
+            }
+        }
+        if (wanted.isEmpty()) {
+            return 0;
+        }
+
+        for (ReleaseEntity held : releaseRepository.findAllByExternalIdIn(wanted)) {
+            byRef.remove(held.getExternalId());
+        }
+
+        int adopted = 0;
+        for (Map.Entry<String, ReleaseDto> entry : byRef.entrySet()) {
+            ReleaseDto dto = entry.getValue();
+            if (dto.title() == null || dto.title().isBlank() || dto.albumId() == null) {
+                // Nothing to draw a shelf with; a row like this would only mask the gap.
+                continue;
+            }
+            ReleaseEntity entity = new ReleaseEntity();
+            entity.setId(UUID.randomUUID());
+            entity.setExternalId(entry.getKey());
+            entity.setReleaseGroupId(adoptAlbum(dto).getId());
+            entity.setTitle(dto.title());
+            entity.setArtistName(dto.artistName() == null ? "" : dto.artistName());
+            entity.setFormat(dto.format() == null ? Format.OTHER : dto.format());
+            entity.setYear(dto.year());
+            entity.setLabel(dto.label());
+            entity.setCatalogNumber(dto.catalogNumber());
+            entity.setCountry(dto.country());
+            entity.setBarcode(dto.barcode());
+            entity.setReleaseDate(dto.releaseDate());
+            entity.setTrackCount(dto.trackCount());
+            entity.setDiscCount(dto.discCount());
+            entity.setCoverArtUrl(dto.coverArtUrl());
+            // Left unknown rather than inferred from the URL: the client's address may be one
+            // this deployment cannot serve, and `null` is what makes a later lookup probe it.
+            entity.setHasCoverArt(null);
+            entity.setFetchedAt(Instant.now());
+            releaseRepository.save(entity);
+            adopted += 1;
+        }
+        if (adopted > 0) {
+            log.info("Adopted {} release(s) from a client into the mirror", adopted);
+        }
+        return adopted;
+    }
+
+    /** The album a client-supplied release belongs to, created only if the mirror lacks it. */
+    private ReleaseGroupEntity adoptAlbum(ReleaseDto dto) {
+        String albumRef = ExternalRef.parse(dto.albumId()).toString();
+        return releaseGroupRepository.findByExternalId(albumRef).orElseGet(() -> {
+            ReleaseGroupEntity group = new ReleaseGroupEntity();
+            group.setId(UUID.randomUUID());
+            group.setExternalId(albumRef);
+            group.setTitle(dto.title());
+            group.setArtistName(dto.artistName() == null ? "" : dto.artistName());
+            group.setFirstReleaseYear(dto.year());
+            group.setFetchedAt(Instant.now());
+            return releaseGroupRepository.save(group);
+        });
+    }
+
     @Transactional(readOnly = true)
     public List<ReleaseDto> getReleases(Collection<String> releaseIds) {
         Set<String> wanted = new LinkedHashSet<>();

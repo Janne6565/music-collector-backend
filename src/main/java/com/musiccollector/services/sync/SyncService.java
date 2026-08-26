@@ -3,6 +3,7 @@ package com.musiccollector.services.sync;
 import com.musiccollector.entity.CopyEntity;
 import com.musiccollector.entity.PhotoEntity;
 import com.musiccollector.entity.WishlistItemEntity;
+import com.musiccollector.model.core.ReleaseDto;
 import com.musiccollector.model.core.SyncCopyDto;
 import com.musiccollector.model.core.SyncPhotoDto;
 import com.musiccollector.model.core.SyncPullDto;
@@ -11,6 +12,7 @@ import com.musiccollector.repository.CopyRepository;
 import com.musiccollector.repository.PhotoRepository;
 import com.musiccollector.model.core.CopyOrigin;
 import com.musiccollector.repository.WishlistItemRepository;
+import com.musiccollector.services.metadata.MetadataService;
 import com.musiccollector.services.social.ActivityService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -50,6 +52,7 @@ public class SyncService {
     private final PhotoRepository photoRepository;
     private final com.musiccollector.services.storage.StorageService storageService;
     private final ActivityService activityService;
+    private final MetadataService metadataService;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -112,7 +115,11 @@ public class SyncService {
             List<SyncCopyDto> incoming,
             List<SyncWishDto> incomingWishes,
             List<SyncPhotoDto> incomingPhotos,
+            List<ReleaseDto> incomingReleases,
             Map<String, String> origins) {
+        // Before the copies, so a release is never briefly nameable by nobody: the moment a
+        // copy is visible to another device, the row that describes it is already here.
+        metadataService.adoptFromClient(incomingReleases);
         Pushed<SyncCopyDto> copies = pushCopies(userId, incoming, origins);
         Pushed<SyncWishDto> wishes = pushWishes(userId, incomingWishes);
         Pushed<SyncPhotoDto> photos = pushPhotos(userId, incomingPhotos);
