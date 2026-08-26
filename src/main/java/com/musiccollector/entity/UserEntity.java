@@ -45,6 +45,14 @@ public class UserEntity {
     private String handle;
 
     /**
+     * When the address was proved reachable, or null while it has not been. Nothing is gated
+     * on it -- see EmailVerificationService for why -- so it is a fact about the mailbox
+     * rather than a permission.
+     */
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
+    /**
      * Bumped to revoke every outstanding refresh token for this user at once. A refresh
      * token carrying an older version is rejected, so "sign out everywhere" is one write.
      */

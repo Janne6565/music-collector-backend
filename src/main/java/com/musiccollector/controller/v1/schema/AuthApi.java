@@ -1,5 +1,6 @@
 package com.musiccollector.controller.v1.schema;
 
+import com.musiccollector.model.action.ConfirmEmailRequest;
 import com.musiccollector.model.action.ForgotPasswordRequest;
 import com.musiccollector.model.action.LoginRequest;
 import com.musiccollector.model.action.RegisterRequest;
@@ -83,6 +84,26 @@ public interface AuthApi {
     ResponseEntity<SessionDto> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request,
             @RequestHeader(name = "X-Token-Mode", required = false) String tokenMode);
+
+    @PostMapping("/confirm-email")
+    @Operation(
+            summary = "Redeem an e-mail confirmation link",
+            description = "Open, because the link is followed in whichever browser opened the mail, "
+                    + "which is not necessarily one that is signed in. The token is the proof.")
+    @ApiResponse(responseCode = "200", description = "The account, now confirmed")
+    @ApiResponse(responseCode = "400", description = "The link is expired, used, or not valid")
+    @ApiResponse(responseCode = "429", description = "Too many attempts")
+    ResponseEntity<UserDto> confirmEmail(@Valid @RequestBody ConfirmEmailRequest request);
+
+    @PostMapping("/confirm-email/resend")
+    @Operation(
+            summary = "Send a fresh confirmation link",
+            description = "Answers 204 whether or not there was anything to send -- an address that is "
+                    + "already confirmed is not an error, it is the state the caller wanted.")
+    @ApiResponse(responseCode = "204", description = "Handled")
+    @ApiResponse(responseCode = "401", description = "Not signed in")
+    @ApiResponse(responseCode = "429", description = "Too many attempts")
+    ResponseEntity<Void> resendEmailConfirmation();
 
     @GetMapping("/me")
     @Operation(summary = "The signed-in account")

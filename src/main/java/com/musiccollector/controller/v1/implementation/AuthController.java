@@ -1,6 +1,7 @@
 package com.musiccollector.controller.v1.implementation;
 
 import com.musiccollector.controller.v1.schema.AuthApi;
+import com.musiccollector.model.action.ConfirmEmailRequest;
 import com.musiccollector.model.action.ForgotPasswordRequest;
 import com.musiccollector.model.action.LoginRequest;
 import com.musiccollector.model.action.RegisterRequest;
@@ -11,6 +12,7 @@ import com.musiccollector.model.core.TokenMode;
 import com.musiccollector.model.core.UserDto;
 import com.musiccollector.security.CurrentUser;
 import com.musiccollector.services.auth.AuthService;
+import com.musiccollector.services.auth.EmailVerificationService;
 import com.musiccollector.services.auth.PasswordResetService;
 import com.musiccollector.services.auth.RefreshCookieFactory;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class AuthController implements AuthApi {
 
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
+    private final EmailVerificationService emailVerificationService;
     private final RefreshCookieFactory refreshCookieFactory;
     private final CurrentUser currentUser;
 
@@ -59,6 +62,17 @@ public class AuthController implements AuthApi {
         return deliver(
                 authService.issueFor(passwordResetService.redeem(request.token(), request.password())),
                 TokenMode.fromHeader(tokenMode));
+    }
+
+    @Override
+    public ResponseEntity<UserDto> confirmEmail(ConfirmEmailRequest request) {
+        return ResponseEntity.ok(AuthService.toDto(emailVerificationService.confirm(request.token())));
+    }
+
+    @Override
+    public ResponseEntity<Void> resendEmailConfirmation() {
+        emailVerificationService.request(currentUser.require());
+        return ResponseEntity.noContent().build();
     }
 
     @Override

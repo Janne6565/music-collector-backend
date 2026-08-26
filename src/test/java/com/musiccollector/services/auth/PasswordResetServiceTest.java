@@ -1,18 +1,18 @@
 package com.musiccollector.services.auth;
 
-import com.musiccollector.configuration.MailProperties;
 import com.musiccollector.entity.PasswordResetEntity;
 import com.musiccollector.entity.UserEntity;
 import com.musiccollector.model.exception.InvalidResetTokenException;
 import com.musiccollector.repository.PasswordResetRepository;
 import com.musiccollector.repository.UserRepository;
-import com.musiccollector.services.mail.MailPort;
+import com.musiccollector.services.mail.AccountMailEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.Instant;
@@ -32,18 +32,13 @@ class PasswordResetServiceTest {
 
     @Mock private UserRepository userRepository;
     @Mock private PasswordResetRepository resetRepository;
-    @Mock private MailPort mailPort;
+    @Mock private ApplicationEventPublisher events;
 
     private PasswordResetService service;
 
     @BeforeEach
     void setUp() {
-        service = new PasswordResetService(
-                userRepository,
-                resetRepository,
-                new BCryptPasswordEncoder(),
-                mailPort,
-                new MailProperties("http://mail", "key", "https://music.example"));
+        service = new PasswordResetService(userRepository, resetRepository, new BCryptPasswordEncoder(), events);
     }
 
     private UserEntity user() {
@@ -66,13 +61,14 @@ class PasswordResetServiceTest {
 
         ArgumentCaptor<PasswordResetEntity> saved = ArgumentCaptor.forClass(PasswordResetEntity.class);
         verify(resetRepository).save(saved.capture());
-        ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
-        verify(mailPort).send(any(), any(), any(), text.capture());
+        ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+        verify(events).publishEvent(published.capture());
 
-        // The raw token is in the mail and nowhere else, so a database leak is not a pile
-        // of account takeovers.
-        assertThat(text.getValue()).contains("https://music.example/reset?token=");
-        assertThat(text.getValue()).doesNotContain(saved.getValue().getTokenHash());
+        // The raw token goes out in the event and only its hash is stored, so a database
+        // leak is not a pile of account takeovers.
+        var event = (AccountMailEvent.PasswordResetRequested) published.getValue();
+        assertThat(event.recipient()).isEqualTo("jonas@example.test");
+        assertThat(event.token()).isNotBlank().isNotEqualTo(saved.getValue().getTokenHash());
         assertThat(saved.getValue().getUsedAt()).isNull();
     }
 
@@ -84,7 +80,7 @@ class PasswordResetServiceTest {
 
         service.request("nobody@example.test");
 
-        verify(mailPort, never()).send(any(), any(), any(), any());
+        verify(events, never()).publishEvent(any(Object.class));
         verify(resetRepository, never()).save(any());
     }
 
@@ -112,6 +108,8 @@ class PasswordResetServiceTest {
         assertThat(user.getPasswordHash()).isNotEqualTo("old-hash");
         // A reset may be locking somebody else out; leaving them signed in would defeat it.
         assertThat(user.getTokenVersion()).isEqualTo(4);
+        // Nobody else can tell the account holder that this happened.
+        verify(events).publishEvent(any(AccountMailEvent.PasswordChanged.class));
     }
 
     @Test

@@ -33,6 +33,10 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private static final String LOGIN = "/api/v1/auth/login";
     /** Sends mail to an address the caller chose, so it needs the same restraint. */
     private static final String FORGOT = "/api/v1/auth/forgot-password";
+    /** Open, and a token to guess. */
+    private static final String CONFIRM = "/api/v1/auth/confirm-email";
+    /** Sends mail. Signed in, so the quota is a brake on a stuck client, not on an attacker. */
+    private static final String RESEND = "/api/v1/auth/confirm-email/resend";
 
     private final Cache<String, Bucket> buckets =
             Caffeine.newBuilder().maximumSize(50_000).expireAfterAccess(Duration.ofMinutes(30)).build();
@@ -45,7 +49,11 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return !(REGISTER.equals(path) || LOGIN.equals(path) || FORGOT.equals(path));
+        return !(REGISTER.equals(path)
+                || LOGIN.equals(path)
+                || FORGOT.equals(path)
+                || CONFIRM.equals(path)
+                || RESEND.equals(path));
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.musiccollector.services.auth;
 
 import com.musiccollector.entity.UserEntity;
 import com.musiccollector.model.core.UserDto;
+import com.musiccollector.repository.CopyRepository;
 import com.musiccollector.repository.PhotoRepository;
 import com.musiccollector.repository.UserRepository;
 import com.musiccollector.services.storage.StorageService;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.Instant;
@@ -26,6 +28,9 @@ class AuthServiceUpdateProfileTest {
     @Mock private PhotoRepository photoRepository;
     @Mock private StorageService storageService;
     @Mock private ConsentService consentService;
+    @Mock private CopyRepository copyRepository;
+    @Mock private EmailVerificationService emailVerificationService;
+    @Mock private ApplicationEventPublisher events;
 
     private AuthService service;
 
@@ -37,7 +42,10 @@ class AuthServiceUpdateProfileTest {
                 jwtService,
                 photoRepository,
                 storageService,
-                consentService);
+                consentService,
+                copyRepository,
+                emailVerificationService,
+                events);
     }
 
     private UserEntity user(String displayName) {

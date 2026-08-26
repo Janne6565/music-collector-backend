@@ -10,12 +10,15 @@ import com.musiccollector.model.core.UserDto;
 import com.musiccollector.model.exception.EmailAlreadyRegisteredException;
 import com.musiccollector.model.exception.InvalidCredentialsException;
 import com.musiccollector.model.exception.NotAuthenticatedException;
+import com.musiccollector.repository.CopyRepository;
 import com.musiccollector.repository.PhotoRepository;
 import com.musiccollector.repository.UserRepository;
+import com.musiccollector.services.mail.AccountMailEvent;
 import com.musiccollector.services.storage.StorageService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +45,9 @@ public class AuthService {
     private final PhotoRepository photoRepository;
     private final StorageService storageService;
     private final ConsentService consentService;
+    private final CopyRepository copyRepository;
+    private final EmailVerificationService emailVerificationService;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public Session register(RegisterRequest request) {
@@ -63,6 +69,10 @@ public class AuthService {
         // Inside the same transaction as the account itself: an account without its consent
         // rows is the one state the record is there to make impossible.
         consentService.recordSignUp(user.getId());
+        // Issued here rather than left to the account screen: an address nobody ever
+        // confirms is one a password reset cannot reach, and the moment somebody typed it is
+        // the moment they are still looking at their inbox.
+        emailVerificationService.request(user);
 
         log.debug("Registered user {}", user.getId());
         return issue(user, true);
@@ -143,17 +153,27 @@ public class AuthService {
      */
     @Transactional
     public void deleteAccount(UserEntity user) {
+        // Read before the rows go, and carried in the event rather than looked up by the
+        // listener, which runs after the commit that removed them.
+        String recipient = user.getEmail();
+        long copies = copyRepository.countByUserIdAndDeletedAtIsNull(user.getId());
         for (PhotoEntity photo : photoRepository.findAllByUserId(user.getId())) {
             if (photo.getStorageKey() != null) {
                 storageService.delete(photo.getStorageKey());
             }
         }
         userRepository.delete(user);
+        events.publishEvent(new AccountMailEvent.AccountDeleted(recipient, copies));
         log.info("Deleted account {}", user.getId());
     }
 
     public static UserDto toDto(UserEntity user) {
-        return new UserDto(user.getId(), user.getEmail(), user.getDisplayName(), user.getCreatedAt());
+        return new UserDto(
+                user.getId(),
+                user.getEmail(),
+                user.getDisplayName(),
+                user.getCreatedAt(),
+                user.getEmailVerifiedAt() != null);
     }
 
     private Session issue(UserEntity user, boolean remember) {

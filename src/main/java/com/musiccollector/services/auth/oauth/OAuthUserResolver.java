@@ -6,9 +6,11 @@ import com.musiccollector.model.exception.OAuthFailedException;
 import com.musiccollector.repository.OAuthIdentityRepository;
 import com.musiccollector.repository.UserRepository;
 import com.musiccollector.services.auth.ConsentService;
+import com.musiccollector.services.mail.AccountMailEvent;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +32,7 @@ public class OAuthUserResolver {
     private final UserRepository userRepository;
     private final OAuthIdentityRepository identityRepository;
     private final ConsentService consentService;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public UserEntity resolve(String provider, OAuthService.ExternalIdentity identity) {
@@ -42,7 +45,8 @@ public class OAuthUserResolver {
                     .orElseThrow(() -> new OAuthFailedException("That account no longer exists."));
         }
 
-        UserEntity user = linkOrCreate(identity);
+        Resolved resolved = linkOrCreate(identity);
+        UserEntity user = resolved.user();
 
         OAuthIdentityEntity link = new OAuthIdentityEntity();
         link.setId(UUID.randomUUID());
@@ -52,17 +56,27 @@ public class OAuthUserResolver {
         link.setCreatedAt(Instant.now());
         identityRepository.save(link);
 
+        if (!resolved.created()) {
+            // Only when the button was attached to an account that already existed. A new
+            // account being created by the provider is not news to anybody: the person is
+            // looking at the screen that did it, and there is no older way in to protect.
+            events.publishEvent(new AccountMailEvent.SignInMethodLinked(user.getEmail(), provider, Instant.now()));
+        }
+
         log.debug("Linked {} identity to user {}", provider, user.getId());
         return user;
     }
 
-    private UserEntity linkOrCreate(OAuthService.ExternalIdentity identity) {
+    /** Whether the account was made here decides who, if anyone, needs telling. */
+    private record Resolved(UserEntity user, boolean created) {}
+
+    private Resolved linkOrCreate(OAuthService.ExternalIdentity identity) {
         if (identity.email() != null) {
             // Linking on a verified e-mail is what lets someone who signed up with a
             // password later use the button without ending up with two collections.
             var byEmail = userRepository.findByEmailIgnoreCase(identity.email());
             if (byEmail.isPresent()) {
-                return byEmail.get();
+                return new Resolved(byEmail.get(), false);
             }
         }
 
@@ -71,6 +85,10 @@ public class OAuthUserResolver {
         // Providers that withhold an e-mail still get an account; the placeholder is
         // unique and never used to send anything.
         user.setEmail(identity.email() == null ? identity.subject() + "@no-email.invalid" : identity.email());
+        // Confirmed by the provider, which is the same trust this class already places in a
+        // provider address when it links one to an account that exists. A withheld address
+        // gets a placeholder instead, and a placeholder has confirmed nothing.
+        user.setEmailVerifiedAt(identity.email() == null ? null : Instant.now());
         // No password: this account can only be reached through the provider until
         // somebody sets one.
         user.setPasswordHash(null);
@@ -84,6 +102,6 @@ public class OAuthUserResolver {
         // press "Continue with Apple" is a screen nobody finishes. The record is the same
         // one a password sign-up leaves, because the agreement is the same.
         consentService.recordSignUp(saved.getId());
-        return saved;
+        return new Resolved(saved, true);
     }
 }

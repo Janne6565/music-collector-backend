@@ -30,6 +30,9 @@ public class SecurityConfig {
             "/api/v1/auth/refresh",
             "/api/v1/auth/forgot-password",
             "/api/v1/auth/reset-password",
+            // Followed in whichever browser opened the mail, which is often not a signed-in
+            // one. The token in the body is the whole proof.
+            "/api/v1/auth/confirm-email",
             "/api/v1/auth/providers",
             "/api/v1/auth/oauth/**",
             // Profiles are open for the same reason the metadata proxy is: a public shelf

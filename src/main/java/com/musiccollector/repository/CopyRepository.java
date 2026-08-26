@@ -37,4 +37,10 @@ public interface CopyRepository extends JpaRepository<CopyEntity, UUID> {
             WHERE c.userId = :userId AND c.deletedAt IS NULL AND c.hidden = FALSE
             """)
     long countVisible(@Param("userId") UUID userId);
+
+    /**
+     * Every copy still on the shelf, hidden ones included. The goodbye mail counts what is
+     * being deleted, and a copy hidden from friends is still one of somebody's records.
+     */
+    long countByUserIdAndDeletedAtIsNull(UUID userId);
 }

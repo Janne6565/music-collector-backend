@@ -506,3 +506,74 @@ Rectification and erasure needed no new endpoints: the name is already `PATCH /a
 withdrawing sharing consent is the Sharing screen saved with everything private, and deletion
 is `DELETE /auth/me` as before — the typed-`LÖSCHEN` confirmation is a client-side gate on it,
 not a second endpoint.
+
+## Transactional mail
+
+Five account mails on one shell, from the "Transactional E-mails" deck (boards 1a–1i). Until
+now the app sent exactly one message — the password reset — with its HTML as a four-line
+string literal inside `PasswordResetService`.
+
+**The shell is a renderer, not a file of templates.** `MailContent` is the pieces a mail can
+be made of (headline, paragraphs, a monospace fact block, one button, one note, a closing
+line, the reason it arrived) and `MailTemplate` turns one into both the HTML and the
+plain-text twin. A new mail is a paragraph and a button, never a second copy of the 600px
+table. The house Mail Service cannot help here: its API is `recipient / subject / body /
+textBody` and it has no templating, so the layer has to live in this repo.
+
+Everything the deck constrained is a rule the renderer enforces, and each one is tested:
+tables and inline styles, **no `<img>` at all** (Gmail blocks remote images, so the wordmark
+is set type), fallback fonts named beside the webfonts because neither loads in most clients,
+every destination printed twice — once as a bulletproof button, once as a bare URL — and
+flattened hex rather than the app's alpha tokens, which Outlook renders unreliably. The
+narrow and dark variants (1g, 1h) are two media queries in the one `<style>` a message is
+allowed, which is why every themed element carries a class beside its inline style.
+
+**Mail is published, not sent.** Services raise an `AccountMailEvent` and
+`AccountMailListener` sends it `AFTER_COMMIT`. A mail cannot be rolled back: "your account
+has been deleted", sent from inside the transaction that then fails, is a claim about
+somebody's data that nothing can withdraw. It also keeps an HTTP call out of a transaction
+holding a database connection. Everything the mail needs travels in the event, because by
+the time it is handled the rows may be gone — which is the entire point for the goodbye,
+whose copy count is read before the delete.
+
+**Three lines the deck drew are deliberately not shipped**, because each would have been
+false: the sign-in location on the password notice (there is no geo-IP, and a parsed
+User-Agent is invented precision — the timestamp ships alone), "encrypted backups roll off
+within 30 days" on the goodbye (there are no backups yet), and "everything you add stays on
+this device" on the confirmation (sync is not gated on confirming). A mail is the copy of a
+claim a person keeps. The footer's third link is named **Nutzungsbedingungen** rather than
+the deck's "AGB", which is what the document is actually called.
+
+**The escape link on a security notice goes to the form, never to a token.** Board 1d draws
+`/secure/<token>`; mailing a working one-click reset inside an unsolicited notice is the
+exact shape the reset flow is careful not to have, so "This wasn't me" points at `/forgot`.
+The notice has no button at all, for the same reason: a notice that looks like it wants a
+click teaches people to click the one a phishing copy of it would put there.
+
+### Confirming an address
+
+`users.email_verified_at` and `email_verifications` (V26), the same shape as `password_resets`
+and for the same reason — only a hash is stored, so a leak is not a pile of confirmed
+addresses. `OneTimeToken` is now shared by both flows.
+
+**Nothing is gated on it.** The app is local-first and an account only adds sync; withholding
+sync until a link is clicked would punish the collection for something the mailbox did. What
+confirmation buys is that the two mails that matter — a reset and a security notice — reach
+somebody who can read them. The link is issued at registration, redeemable at
+`POST /auth/confirm-email` (open: it is followed in whichever browser opened the mail, and
+the token is the whole proof), and re-issuable from the Account screen. Confirming twice does
+not restamp the date: when the address was proved is a fact, and a link clicked again is not
+a second proof.
+
+Accounts made through a provider are stamped confirmed at creation, including the ones the
+migration backfills — that is the same trust `OAuthUserResolver` already places in a provider
+address when it links one to an account that exists. Withheld addresses get the
+`@no-email.invalid` placeholder and are never posted to; the listener drops every event
+addressed to one.
+
+### Open
+
+**The mails are English.** The app is bilingual and the legal documents are binding in German,
+but `users` carries no language, so there is nothing to pick a translation with. A `locale`
+column and a second copy deck is its own turn. Until then the copy blocks are measured for
+German, as the deck was drawn.

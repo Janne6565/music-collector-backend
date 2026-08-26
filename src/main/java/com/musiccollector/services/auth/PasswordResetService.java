@@ -1,26 +1,21 @@
 package com.musiccollector.services.auth;
 
-import com.musiccollector.configuration.MailProperties;
 import com.musiccollector.entity.PasswordResetEntity;
 import com.musiccollector.entity.UserEntity;
 import com.musiccollector.model.exception.InvalidResetTokenException;
 import com.musiccollector.repository.PasswordResetRepository;
 import com.musiccollector.repository.UserRepository;
-import com.musiccollector.services.mail.MailPort;
+import com.musiccollector.services.mail.AccountMailEvent;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.UUID;
 
 /**
@@ -47,13 +42,10 @@ public class PasswordResetService {
     /** Long enough to find the mail, short enough that an unread one stops working. */
     private static final Duration LIFETIME = Duration.ofHours(1);
 
-    private static final SecureRandom RANDOM = new SecureRandom();
-
     private final UserRepository userRepository;
     private final PasswordResetRepository passwordResetRepository;
     private final PasswordEncoder passwordEncoder;
-    private final MailPort mailPort;
-    private final MailProperties mailProperties;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public void request(String email) {
@@ -63,36 +55,17 @@ public class PasswordResetService {
             return;
         }
 
-        byte[] raw = new byte[32];
-        RANDOM.nextBytes(raw);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
+        String token = OneTimeToken.issue();
 
         PasswordResetEntity reset = new PasswordResetEntity();
         reset.setId(UUID.randomUUID());
         reset.setUserId(user.getId());
-        reset.setTokenHash(hash(token));
+        reset.setTokenHash(OneTimeToken.hash(token));
         reset.setExpiresAt(Instant.now().plus(LIFETIME));
         reset.setCreatedAt(Instant.now());
         passwordResetRepository.save(reset);
 
-        String link = "%s/reset?token=%s".formatted(trimTrailingSlash(mailProperties.publicUrl()), token);
-        mailPort.send(
-                user.getEmail(),
-                "Reset your Music Collector password",
-                """
-                <p>Someone asked to reset the password for your Music Collector account.</p>
-                <p><a href="%s">Choose a new password</a></p>
-                <p>The link works once and expires in an hour. If this wasn't you, nothing has
-                changed and you can ignore this message.</p>
-                """.formatted(link),
-                """
-                Someone asked to reset the password for your Music Collector account.
-
-                Choose a new password: %s
-
-                The link works once and expires in an hour. If this wasn't you, nothing has
-                changed and you can ignore this message.
-                """.formatted(link));
+        events.publishEvent(new AccountMailEvent.PasswordResetRequested(user.getEmail(), token));
 
         log.debug("Reset link issued for user {}", user.getId());
     }
@@ -101,7 +74,7 @@ public class PasswordResetService {
     @Transactional
     public UserEntity redeem(String token, String newPassword) {
         PasswordResetEntity reset = passwordResetRepository
-                .findByTokenHash(hash(token))
+                .findByTokenHash(OneTimeToken.hash(token))
                 .filter(candidate -> candidate.getUsedAt() == null)
                 .filter(candidate -> candidate.getExpiresAt().isAfter(Instant.now()))
                 .orElseThrow(InvalidResetTokenException::new);
@@ -117,20 +90,12 @@ public class PasswordResetService {
         reset.setUsedAt(Instant.now());
         passwordResetRepository.save(reset);
 
+        // A notice, not a question: someone whose password was changed without them asking
+        // has no other way of finding out, and the mail is the only thing standing between a
+        // quiet takeover and being noticed.
+        events.publishEvent(new AccountMailEvent.PasswordChanged(user.getEmail(), Instant.now()));
+
         log.debug("Password reset completed for user {}", user.getId());
         return user;
-    }
-
-    private static String hash(String token) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return Base64.getEncoder().encodeToString(digest.digest(token.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is required by the platform", e);
-        }
-    }
-
-    private static String trimTrailingSlash(String value) {
-        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 }
