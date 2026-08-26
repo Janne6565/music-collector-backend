@@ -288,6 +288,25 @@ class EmailVerificationServiceTest {
     }
 
     @Test
+    void cancellingAChangeThatIsStillWaitingAlsoSignsEverybodyOut() {
+        UserEntity user = user("jonas@example.test", Instant.now());
+        EmailVerificationEntity change = outstanding(user.getId(), Instant.now());
+        change.setNewEmail("j.meyer@posteo.de");
+        change.setPreviousEmail("jonas@example.test");
+        change.setCancelTokenHash("cancel-hash");
+        change.setCancelExpiresAt(Instant.now().plusSeconds(3600));
+        when(verificationRepository.findByCancelTokenHash(any())).thenReturn(Optional.of(change));
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+        service.cancelChange("whatever");
+
+        // The address never moved, but whoever asked for the change is holding a session --
+        // and this link exists for the case where that is not the account holder.
+        assertThat(user.getEmail()).isEqualTo("jonas@example.test");
+        assertThat(user.getTokenVersion()).isEqualTo(3);
+    }
+
+    @Test
     void anExpiredCancelLinkIsRefused() {
         EmailVerificationEntity change = outstanding(UUID.randomUUID(), Instant.now());
         change.setCancelTokenHash("cancel-hash");

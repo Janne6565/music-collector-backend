@@ -234,12 +234,15 @@ public class EmailVerificationService {
             // Already gone through. Putting the address back is the whole reason this token
             // outlives the link.
             user.setEmail(change.getPreviousEmail());
-            user.setUpdatedAt(Instant.now());
-            // Whoever asked for the change is holding a session; a hijack undone that leaves
-            // them signed in has been undone in name only.
-            user.setTokenVersion(user.getTokenVersion() + 1);
-            userRepository.save(user);
         }
+        // Every time, not only once the change has landed. Whoever asked for it is holding a
+        // session either way, and this link exists precisely for the case where that is not
+        // the account holder -- an undo that leaves them signed in has undone nothing. It is
+        // also what makes the page's promise ("every device has been signed out") true for a
+        // change that was still waiting.
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
         change.setUsedAt(Instant.now());
         change.setCancelTokenHash(null);
         change.setCancelExpiresAt(null);
