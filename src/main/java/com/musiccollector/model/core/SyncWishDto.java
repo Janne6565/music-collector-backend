@@ -12,6 +12,8 @@ public record SyncWishDto(
         String id,
         /** Accepted as `releaseGroupMbid` too, for the same reason as SyncCopyDto#releaseId. */
         @JsonAlias("releaseGroupMbid") String albumId,
+        /** The pressing the entry was made from, or null. Absent from an older client. */
+        String releaseId,
         String title,
         String artistName,
         Integer year,

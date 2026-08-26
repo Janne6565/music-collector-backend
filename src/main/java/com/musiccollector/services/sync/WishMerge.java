@@ -18,7 +18,15 @@ import java.util.Objects;
 public final class WishMerge {
 
     public static final List<String> MERGEABLE_FIELDS = List.of(
-            "albumId", "title", "artistName", "year", "desiredFormat", "note", "sortIndex", "deletedAt");
+            "albumId",
+            "releaseId",
+            "title",
+            "artistName",
+            "year",
+            "desiredFormat",
+            "note",
+            "sortIndex",
+            "deletedAt");
 
     private WishMerge() {}
 
@@ -51,6 +59,7 @@ public final class WishMerge {
         return new SyncWishDto(
                 local.id(),
                 (String) values.get("albumId"),
+                (String) values.get("releaseId"),
                 (String) values.get("title"),
                 (String) values.get("artistName"),
                 (Integer) values.get("year"),
@@ -80,6 +89,7 @@ public final class WishMerge {
     private static Object valueOf(SyncWishDto wish, String field) {
         return switch (field) {
             case "albumId" -> wish.albumId();
+            case "releaseId" -> wish.releaseId();
             case "title" -> wish.title();
             case "artistName" -> wish.artistName();
             case "year" -> wish.year();

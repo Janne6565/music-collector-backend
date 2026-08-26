@@ -143,6 +143,7 @@ public class ProfileService {
                 .map(wish -> new SharedWishDto(
                         wish.getId().toString(),
                         wish.getAlbumId(),
+                        wish.getReleaseId(),
                         wish.getTitle(),
                         wish.getArtistName(),
                         wish.getYear(),

@@ -329,6 +329,7 @@ public class SyncService {
 
     private void applyWish(WishlistItemEntity entity, SyncWishDto dto) {
         entity.setAlbumId(dto.albumId());
+        entity.setReleaseId(dto.releaseId());
         entity.setTitle(dto.title() == null ? "Untitled" : dto.title());
         entity.setArtistName(dto.artistName() == null ? "Unknown artist" : dto.artistName());
         entity.setYear(dto.year());
@@ -344,6 +345,7 @@ public class SyncService {
         return new SyncWishDto(
                 entity.getId().toString(),
                 entity.getAlbumId(),
+                entity.getReleaseId(),
                 entity.getTitle(),
                 entity.getArtistName(),
                 entity.getYear(),

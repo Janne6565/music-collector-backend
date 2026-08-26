@@ -27,6 +27,15 @@ public class WishlistItemEntity {
     @Column(name = "album_id", nullable = false)
     private String albumId;
 
+    /**
+     * The pressing the entry was made from, or null when none was picked.
+     *
+     * The wish is still for the album; this only says which sleeve it was wearing when it
+     * was added, so the clients do not have to guess one back out of the mirror.
+     */
+    @Column(name = "release_id")
+    private String releaseId;
+
     @Column(nullable = false)
     private String title;
 
