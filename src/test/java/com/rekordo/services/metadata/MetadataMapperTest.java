@@ -68,7 +68,7 @@ class MetadataMapperTest {
 
     @Test
     void takesTheFormatFromTheFirstMedium() {
-        var media = List.of(new MusicBrainzResponses.Medium("12\" Vinyl", null, null), new MusicBrainzResponses.Medium("CD", null, null));
+        var media = List.of(new MusicBrainzResponses.Medium("12\" Vinyl", null, null, null, null, null), new MusicBrainzResponses.Medium("CD", null, null, null, null, null));
 
         assertThat(MetadataMapper.format(release(null, null, media, "1980"))).isEqualTo(Format.VINYL);
     }
@@ -170,13 +170,13 @@ class MetadataMapperTest {
     @Test
     void countsDiscsAcrossEveryMedium() {
         // A 2xLP is one release with two discs, and the pressing table says so.
-        var twoDiscs = List.of(new MusicBrainzResponses.Medium("12\" Vinyl", 2, 6));
+        var twoDiscs = List.of(new MusicBrainzResponses.Medium("12\" Vinyl", null, null, 2, 6, null));
         assertThat(MetadataMapper.discCount(release(null, null, twoDiscs, "1970"))).isEqualTo(2);
 
         // A medium that does not report a disc count is still a disc.
         var unreported = List.of(
-                new MusicBrainzResponses.Medium("CD", null, 9),
-                new MusicBrainzResponses.Medium("DVD", null, 3));
+                new MusicBrainzResponses.Medium("CD", null, null, null, 9, null),
+                new MusicBrainzResponses.Medium("DVD", null, null, null, 3, null));
         assertThat(MetadataMapper.discCount(release(null, null, unreported, "1999"))).isEqualTo(2);
 
         assertThat(MetadataMapper.discCount(release(null, null, null, "1970"))).isNull();
@@ -196,5 +196,21 @@ class MetadataMapperTest {
         entity.setCoverArtUrl(COVER_URL);
         entity.setHasCoverArt(hasCoverArt);
         return entity;
+    }
+
+    @Test
+    void track_count_falls_back_to_the_media_when_the_payload_states_no_total() {
+        var lookup = release(
+                List.of(),
+                List.of(),
+                List.of(
+                        new MusicBrainzResponses.Medium("CD", null, null, null, 9, null),
+                        new MusicBrainzResponses.Medium("DVD", null, null, null, 3, null)),
+                "1980");
+
+        // A search states the total; a lookup states it per medium and nothing at the top.
+        // Both land in the same column, and the tracklist header reads it before its rows
+        // have arrived — so a lookup-persisted release must not sit there at null.
+        assertThat(MetadataMapper.trackCount(lookup)).isEqualTo(12);
     }
 }

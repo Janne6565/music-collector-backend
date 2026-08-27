@@ -69,6 +69,7 @@ public class MetadataService {
     private final ReleaseRepository releaseRepository;
     private final ReleaseGroupRepository releaseGroupRepository;
     private final ArtistImageRepository artistImageRepository;
+    private final TrackMirror trackMirror;
 
     /**
      * Releases matching a query, Discogs first.
@@ -448,18 +449,33 @@ public class MetadataService {
     }
 
     /**
+     * The mirror's row for one release, fetched from MusicBrainz if it is not held yet.
+     *
+     * <p>Package-private because {@link TracklistService} needs the entity rather than the
+     * DTO — it reads the tracklist hanging off it, and has to know whether the row was just
+     * written by a lookup (which carries tracks) or has been sitting there since a search
+     * (which does not).
+     *
+     * <p>Discogs ids never reach MusicBrainz: they are not addresses it can resolve, and the
+     * request would spend a paced slot to be told so.
+     */
+    @Transactional
+    Optional<ReleaseEntity> mirrorRow(ExternalRef ref) {
+        return releaseRepository
+                .findByExternalId(ref.toString())
+                .or(() -> ref.source() == ReleaseSource.MUSICBRAINZ
+                        ? musicBrainzClient.lookupRelease(ref.id()).flatMap(this::persist)
+                        : Optional.empty());
+    }
+
+    /**
      * Full detail for one release, including its cover theme. The palette is sampled and
      * persisted on the first lookup and reused by every caller afterwards.
      */
     @Transactional
     public ReleaseDto getRelease(String releaseId) {
         ExternalRef ref = ExternalRef.parse(releaseId);
-        ReleaseEntity entity = releaseRepository
-                .findByExternalId(ref.toString())
-                .or(() -> musicBrainzClient
-                        .lookupRelease(ref.id())
-                        .flatMap(this::persist))
-                .orElseThrow(() -> new ReleaseNotFoundException(releaseId));
+        ReleaseEntity entity = mirrorRow(ref).orElseThrow(() -> new ReleaseNotFoundException(releaseId));
 
         // Skipped once we know there is no cover: without this the palette fetch runs on
         // every single lookup of an artless release, and always comes back empty.
@@ -690,7 +706,7 @@ public class MetadataService {
         entity.setCountry(release.country());
         entity.setBarcode(release.barcode());
         entity.setReleaseDate(release.date());
-        entity.setTrackCount(release.trackCount());
+        entity.setTrackCount(MetadataMapper.trackCount(release));
         entity.setDiscCount(MetadataMapper.discCount(release));
         entity.setCoverArtUrl(coverArtClient.frontCoverUrl(release.id()));
         // A lookup tells us whether there is a front cover; a search does not mention it at
@@ -698,7 +714,15 @@ public class MetadataService {
         entity.setHasCoverArt(
                 release.coverArtArchive() == null ? null : release.coverArtArchive().front());
         entity.setFetchedAt(Instant.now());
-        return Optional.of(releaseRepository.save(entity));
+        ReleaseEntity saved = releaseRepository.save(entity);
+
+        // A lookup asked for `recordings` and a search did not, so only one of the two paths
+        // through here arrives holding titles. Taking them now is what keeps opening a sheet
+        // for a release the mirror has never seen down to a single upstream call.
+        if (TrackMirror.carriesTracks(release)) {
+            trackMirror.store(saved, release);
+        }
+        return Optional.of(saved);
     }
 
     private ReleaseGroupEntity ensureReleaseGroup(MusicBrainzResponses.Release release) {

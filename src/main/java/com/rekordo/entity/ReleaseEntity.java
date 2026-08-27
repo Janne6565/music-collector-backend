@@ -86,4 +86,14 @@ public class ReleaseEntity {
 
     @Column(name = "fetched_at", nullable = false)
     private Instant fetchedAt;
+
+    /**
+     * When the tracklist was last read from the catalogue, or null if it never was.
+     *
+     * <p>Null is "not asked yet", not "no tracks" — the same distinction {@link #hasCoverArt}
+     * draws, and for the same reason: without it a release the catalogue has no tracklist
+     * for re-queries a one-request-per-second upstream every time its sheet opens.
+     */
+    @Column(name = "tracks_fetched_at")
+    private Instant tracksFetchedAt;
 }

@@ -6,7 +6,9 @@ import com.rekordo.model.core.ArtistDto;
 import com.rekordo.model.core.ArtistImageDto;
 import com.rekordo.model.core.DiscographyDto;
 import com.rekordo.model.core.ReleaseDto;
+import com.rekordo.model.core.TracklistDto;
 import com.rekordo.services.metadata.MetadataService;
+import com.rekordo.services.metadata.TracklistService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -21,6 +23,7 @@ import java.util.UUID;
 public class MetadataController implements MetadataApi {
 
     private final MetadataService metadataService;
+    private final TracklistService tracklistService;
 
     @Override
     public ResponseEntity<List<ReleaseDto>> search(String query, int limit) {
@@ -66,5 +69,10 @@ public class MetadataController implements MetadataApi {
     @Override
     public ResponseEntity<ReleaseDto> getRelease(String releaseId) {
         return ResponseEntity.ok(metadataService.getRelease(releaseId));
+    }
+
+    @Override
+    public ResponseEntity<TracklistDto> getTracklist(String releaseId) {
+        return ResponseEntity.ok(tracklistService.tracklist(releaseId));
     }
 }

@@ -75,6 +75,30 @@ public final class MetadataMapper {
         return total > 0 ? total : release.media().size();
     }
 
+    /**
+     * Tracks across every medium.
+     *
+     * <p>A <em>search</em> result states this at the top level; a lookup does not, and states
+     * it per medium instead. Both paths land in the same column, so the fallback is what
+     * keeps a release opened directly — rather than found through a search — from knowing
+     * how many tracks it has. The tracklist section states that count before its titles
+     * arrive (design 26e), and a null there is a header that fills in late.
+     */
+    public static Integer trackCount(MusicBrainzResponses.Release release) {
+        if (release.trackCount() != null) {
+            return release.trackCount();
+        }
+        if (release.media() == null || release.media().isEmpty()) {
+            return null;
+        }
+        int total = release.media().stream()
+                .map(MusicBrainzResponses.Medium::trackCount)
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+        return total > 0 ? total : null;
+    }
+
     public static String label(MusicBrainzResponses.Release release) {
         return firstLabelInfo(release)
                 .map(MusicBrainzResponses.LabelInfo::label)

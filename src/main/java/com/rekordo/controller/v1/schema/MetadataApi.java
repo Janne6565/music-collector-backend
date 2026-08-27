@@ -5,6 +5,7 @@ import com.rekordo.model.core.ArtistDto;
 import com.rekordo.model.core.ArtistImageDto;
 import com.rekordo.model.core.DiscographyDto;
 import com.rekordo.model.core.ReleaseDto;
+import com.rekordo.model.core.TracklistDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -134,5 +135,25 @@ public interface MetadataApi {
     @ApiResponse(responseCode = "200", description = "The release")
     @ApiResponse(responseCode = "404", description = "No such release")
     ResponseEntity<ReleaseDto> getRelease(
+            @PathVariable("releaseId") @NotBlank @Size(max = 120) String releaseId);
+
+    @GetMapping("/releases/{releaseId}/tracks")
+    @Operation(
+            summary = "One release's tracklist",
+            description = "Read from the mirror, and from MusicBrainz exactly once per release — "
+                    + "the upstream is paced at one request per second, so a detail sheet that "
+                    + "re-asked on every open would queue behind every search in the app. "
+                    + "Numbering is the catalogue's own and is never recomputed: a double LP reads "
+                    + "A1 through D6. Durations are milliseconds and are routinely absent for "
+                    + "individual tracks. A track carries an artist only where it differs from the "
+                    + "release's, which is a compilation and nothing else.\n\n"
+                    + "A release with no tracklist is still a 200: `unavailableReason` says why, and "
+                    + "the count the mirror already knew comes back with it, because the sheet states "
+                    + "that count whether or not the titles ever arrive. Those reasons are permanent "
+                    + "and offer nothing to retry. The catalogue failing to answer is the opposite "
+                    + "case and is a 502.")
+    @ApiResponse(responseCode = "200", description = "The tracklist, or the reason there is none")
+    @ApiResponse(responseCode = "502", description = "The catalogue did not answer — worth retrying")
+    ResponseEntity<TracklistDto> getTracklist(
             @PathVariable("releaseId") @NotBlank @Size(max = 120) String releaseId);
 }

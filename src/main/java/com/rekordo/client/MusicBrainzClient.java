@@ -27,7 +27,11 @@ import java.util.regex.Pattern;
 public class MusicBrainzClient {
 
     private static final Logger log = LoggerFactory.getLogger(MusicBrainzClient.class);
-    private static final String LOOKUP_INCLUDES = "artist-credits+labels+release-groups+media";
+    // `recordings` is what turns `media` from a count into a tracklist, and it brings the
+    // per-track artist credits with it because `artist-credits` is already asked for. It
+    // costs nothing extra: this is the same single request either way, and the response
+    // grows only for releases somebody opened.
+    private static final String LOOKUP_INCLUDES = "artist-credits+labels+release-groups+media+recordings";
 
     /** "https://www.discogs.com/artist/1055923" and "…/artist/1055923-Daughter" both occur. */
     private static final Pattern DISCOGS_ARTIST_URL = Pattern.compile("/artist/(\\d+)");
@@ -195,9 +199,10 @@ public class MusicBrainzClient {
                             .build(mbid))
                     .retrieve()
                     .body(MusicBrainzResponses.Release.class));
-        } catch (HttpClientErrorException.NotFound e) {
-            // MusicBrainz genuinely has no such release. That is a 404 for our caller, not
-            // an upstream failure — reporting it as 502 would tell the client to retry.
+        } catch (HttpClientErrorException.NotFound | HttpClientErrorException.BadRequest e) {
+            // MusicBrainz genuinely has no such release, or will never accept the id as one
+            // ("Invalid mbid."). Neither is an upstream failure — reporting either as a 502
+            // would tell the client to retry something that cannot change.
             return Optional.empty();
         } catch (RestClientException e) {
             throw new UpstreamUnavailableException("MusicBrainz", e);

@@ -94,6 +94,30 @@ public final class MusicBrainzResponses {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Medium(
             String format,
+            /** 1-based, and only present on a lookup — search results carry no position. */
+            Integer position,
+            /** Named discs happen on box sets; everywhere else this is "" rather than null. */
+            String title,
             @JsonProperty("disc-count") Integer discCount,
-            @JsonProperty("track-count") Integer trackCount) {}
+            @JsonProperty("track-count") Integer trackCount,
+            /** Only present when the lookup asked for {@code recordings}. */
+            List<Track> tracks) {}
+
+    /**
+     * One track of a medium.
+     *
+     * <p>{@code number} is a string and must stay one: CDs number "1", "2", vinyl numbers
+     * "A1", "B2", and the second LP of a double starts at "C1". {@code length} is
+     * milliseconds and is frequently null on individual tracks of an otherwise complete
+     * disc. {@code artistCredit} is per track, which only matters on compilations — it is
+     * the release credit repeated on every row of a normal album.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Track(
+            String id,
+            String number,
+            Integer position,
+            String title,
+            Integer length,
+            @JsonProperty("artist-credit") List<ArtistCredit> artistCredit) {}
 }
