@@ -583,7 +583,7 @@ boolean, never the account object: depending on the account would re-run the eff
 very dispatch it makes.
 
 Turning the mail link into one that opens the app is deployment work, not app work — an
-`apple-app-site-association` served from `music.jannekeipert.de` and an `assetlinks.json`
+`apple-app-site-association` served from `rekordo.jannekeipert.de` and an `assetlinks.json`
 for Android, plus `associatedDomains` / `intentFilters` in `app.json`. Not done. The screen
 exists so that the flow lands in the app the day those are configured.
 

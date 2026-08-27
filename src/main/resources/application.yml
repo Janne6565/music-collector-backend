@@ -95,7 +95,7 @@ rekordo:
     base-url: https://musicbrainz.org/ws/2
     cover-art-base-url: https://coverartarchive.org
     # MusicBrainz requires a descriptive, contactable User-Agent and caps callers at 1 req/s.
-    user-agent: ${MC_MUSICBRAINZ_USER_AGENT:Rekordo/0.1 (https://github.com/Janne6565/music-collector-backend)}
+    user-agent: ${MC_MUSICBRAINZ_USER_AGENT:Rekordo/0.1 (https://github.com/Janne6565/rekordo-backend)}
     requests-per-second: 1
     # Per-IP quota for the open metadata proxy.
     anonymous-requests-per-minute: 30
@@ -103,7 +103,7 @@ rekordo:
   discogs:
     base-url: https://api.discogs.com
     # Discogs rejects the default Java User-Agent outright.
-    user-agent: ${MC_DISCOGS_USER_AGENT:Rekordo/0.1 +https://music.jannekeipert.de}
+    user-agent: ${MC_DISCOGS_USER_AGENT:Rekordo/0.1 +https://rekordo.jannekeipert.de}
     # Optional, and the app runs without it — but anonymous callers get 25 requests a
     # minute instead of 60, and every cover image comes back as an empty string.
     token: ${MC_DISCOGS_TOKEN:}
