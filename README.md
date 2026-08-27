@@ -1,6 +1,6 @@
-# music-collector-backend
+# rekordo-backend
 
-Backend for **Music Collector**, a record-collection tracker for vinyl, CD, cassette and
+Backend for **Rekordo**, a record-collection tracker for vinyl, CD, cassette and
 digital copies.
 
 The app is **local-first**: it works fully with no account, keeping everything in the

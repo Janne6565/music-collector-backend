@@ -1,7 +1,7 @@
-# Music Collector — plan
+# Rekordo — plan
 
 Source design: Claude Design project `a1b6280a-eae4-4ab0-aab3-68ea4a303c9b`
-(`Music Collector.dc.html`, with `FormatThumb.dc.html`). `ios-frame.jsx` and `support.js`
+(`Rekordo.dc.html`, with `FormatThumb.dc.html`). `ios-frame.jsx` and `support.js`
 are mockup scaffolding and are **not** ported.
 
 ## Decisions
@@ -20,10 +20,10 @@ are mockup scaffolding and are **not** ported.
 
 ## Repos
 
-- `music-collector-backend` — this repo. Auth, sync, metadata proxy, image storage.
-- `music-collector-frontend` — React + Vite + Bun web app (screens `1f`, `1g`).
-- `music-collector-mobile` — Expo app (screens `1b`, `1j`, `1d`, `1e`, `2a`, `1l`).
-- `music-collector-deployment` — Kustomize base + overlays, watched by ArgoCD.
+- `rekordo-backend` — this repo. Auth, sync, metadata proxy, image storage.
+- `rekordo-frontend` — React + Vite + Bun web app (screens `1f`, `1g`).
+- `rekordo-mobile` — Expo app (screens `1b`, `1j`, `1d`, `1e`, `2a`, `1l`).
+- `rekordo-deployment` — Kustomize base + overlays, watched by ArgoCD.
 
 ## Architecture: local-first
 

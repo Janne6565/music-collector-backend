@@ -1,0 +1,22 @@
+package com.rekordo.repository;
+
+import com.rekordo.entity.ReleaseEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface ReleaseRepository extends JpaRepository<ReleaseEntity, UUID> {
+
+    Optional<ReleaseEntity> findByExternalId(String externalId);
+
+    List<ReleaseEntity> findAllByExternalIdIn(Collection<String> externalIds);
+
+    /** Barcode scans check the local mirror before ever calling MusicBrainz. */
+    List<ReleaseEntity> findAllByBarcode(String barcode);
+
+    /** Every mirrored pressing of a set of albums, for resolving album artwork. */
+    List<ReleaseEntity> findAllByReleaseGroupIdIn(Collection<UUID> releaseGroupIds);
+}

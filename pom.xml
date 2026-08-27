@@ -8,11 +8,11 @@
 		<version>4.1.0</version>
 		<relativePath/>
 	</parent>
-	<groupId>com.musiccollector</groupId>
+	<groupId>com.rekordo</groupId>
 	<artifactId>backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>backend</name>
-	<description>Music Collector API — auth, sync and the MusicBrainz metadata proxy</description>
+	<description>Rekordo API — auth, sync and the MusicBrainz metadata proxy</description>
 
 	<properties>
 		<java.version>25</java.version>

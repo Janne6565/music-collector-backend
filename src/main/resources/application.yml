@@ -1,6 +1,6 @@
 spring:
   application:
-    name: music-collector-backend
+    name: rekordo-backend
   servlet:
     multipart:
       # Slightly above the app's own limit, so an oversized upload is rejected by the
@@ -26,7 +26,7 @@ spring:
       # RFC 7807 for framework-raised errors too, not just BaseException.
       enabled: true
 
-music-collector:
+rekordo:
   jwt:
     # No fallback on purpose: the app must fail to start rather than run on a known secret.
     secret: ${MC_JWT_SECRET}
@@ -55,6 +55,9 @@ music-collector:
     public-base-url: ${MC_PUBLIC_URL:http://localhost:5173}
     # Where the callback reopens the phone app. Matches the "scheme" in the mobile app.json;
     # the provider never sees this, only the https redirect URI built from public-base-url.
+    # Deliberately still the old name during the rename: this value has to change in the
+    # same breath as the shipped app's scheme, or a build that is listening for
+    # musiccollector:// never learns its sign-in finished.
     mobile-redirect-uri: ${MC_MOBILE_REDIRECT_URI:musiccollector://auth/callback}
     # A provider appears on the sign-in screen only when its credentials are set, so an
     # unconfigured one is invisible rather than a button that fails.
@@ -92,7 +95,7 @@ music-collector:
     base-url: https://musicbrainz.org/ws/2
     cover-art-base-url: https://coverartarchive.org
     # MusicBrainz requires a descriptive, contactable User-Agent and caps callers at 1 req/s.
-    user-agent: ${MC_MUSICBRAINZ_USER_AGENT:MusicCollector/0.1 (https://github.com/Janne6565/music-collector-backend)}
+    user-agent: ${MC_MUSICBRAINZ_USER_AGENT:Rekordo/0.1 (https://github.com/Janne6565/music-collector-backend)}
     requests-per-second: 1
     # Per-IP quota for the open metadata proxy.
     anonymous-requests-per-minute: 30
@@ -100,7 +103,7 @@ music-collector:
   discogs:
     base-url: https://api.discogs.com
     # Discogs rejects the default Java User-Agent outright.
-    user-agent: ${MC_DISCOGS_USER_AGENT:MusicCollector/0.1 +https://music.jannekeipert.de}
+    user-agent: ${MC_DISCOGS_USER_AGENT:Rekordo/0.1 +https://music.jannekeipert.de}
     # Optional, and the app runs without it — but anonymous callers get 25 requests a
     # minute instead of 60, and every cover image comes back as an empty string.
     token: ${MC_DISCOGS_TOKEN:}
@@ -122,4 +125,4 @@ springdoc:
 
 logging:
   level:
-    com.musiccollector: DEBUG
+    com.rekordo: DEBUG
