@@ -116,6 +116,22 @@ public class MailTemplate {
                             .formatted(MONO, MUTED, String.join("<br>", content.facts().stream().map(MailTemplate::esc).toList())));
         }
 
+        if (!content.rows().isEmpty()) {
+            // Plain rows rather than a table of their own: a nested grid is the first thing
+            // a mail client breaks, and a record is two lines of type, not a layout.
+            boolean firstRow = true;
+            for (MailContent.Row entry : content.rows()) {
+                row(
+                        rows,
+                        (firstRow ? "22px" : "16px") + " 40px 0",
+                        ("<div class=\"mc-ink\" style=\"font:600 14px/1.4 %s;color:%s\">%s</div>"
+                                        + "<div class=\"mc-mono\" style=\"font:400 12.5px/1.5 %s;color:%s;"
+                                        + "padding-top:2px\">%s</div>")
+                                .formatted(SANS, INK, esc(entry.title()), SANS, MUTED, esc(entry.detail())));
+                firstRow = false;
+            }
+        }
+
         if (content.action() != null) {
             row(rows, "26px 40px 0", button(content.action()));
             row(
@@ -138,7 +154,7 @@ public class MailTemplate {
                             .formatted(SERIF, TEXT, esc(content.closing())));
         }
 
-        row(rows, "34px 0 0", footer(content.footerReason()));
+        row(rows, "34px 0 0", footer(content.footerReason(), content.unsubscribe()));
 
         return """
                 <!DOCTYPE html>
@@ -217,7 +233,7 @@ public class MailTemplate {
                 .formatted(NOTE, inner);
     }
 
-    private String footer(String reason) {
+    private String footer(String reason, MailContent.Unsubscribe unsubscribe) {
         StringBuilder links = new StringBuilder();
         for (String[] link : LEGAL_LINKS) {
             if (!links.isEmpty()) {
@@ -226,14 +242,25 @@ public class MailTemplate {
             links.append("<a class=\"mc-link\" href=\"%s\" style=\"color:%s\">%s</a>"
                     .formatted(esc(publicUrl() + link[1]), ACCENT_STRONG, link[0]));
         }
+        // The slot the shell has always had and nothing used until the digest. It names the
+        // one category being switched off, because a link that also silenced security
+        // notices would be a trap.
+        String stop = unsubscribe == null
+                ? ""
+                : ("<div class=\"mc-mono-body\" style=\"font:400 12.5px/1.62 %s;color:%s;padding-top:8px\">"
+                                + "<a class=\"mc-link\" href=\"%s\" style=\"color:%s\">%s</a> — %s</div>")
+                        .formatted(SANS, MUTED, esc(unsubscribe.url()), ACCENT_STRONG, esc(unsubscribe.label()),
+                                esc(unsubscribe.what()));
+
         return ("<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" class=\"mc-footer\" "
                         + "style=\"width:100%%;border-collapse:collapse;background:%s;border-top:1px solid %s\">"
                         + "<tbody><tr><td class=\"mc-pad\" style=\"padding:22px 40px 24px\">"
                         + "<div class=\"mc-mono-body\" style=\"font:400 12.5px/1.62 %s;color:%s\">%s</div>"
+                        + "%s"
                         + "<div class=\"mc-faint\" style=\"font:400 12px/1.62 %s;color:%s;padding-top:12px\">%s</div>"
                         + "<div style=\"font:400 12px/1.62 %s;padding-top:6px\">%s</div>"
                         + "</td></tr></tbody></table>")
-                .formatted(FOOTER, BORDER, SANS, MUTED, esc(reason), SANS, FAINT, OPERATOR_LINE, SANS, links);
+                .formatted(FOOTER, BORDER, SANS, MUTED, esc(reason), stop, SANS, FAINT, OPERATOR_LINE, SANS, links);
     }
 
     /**
@@ -291,6 +318,11 @@ public class MailTemplate {
             content.facts().forEach(fact -> out.add(plain(fact)));
             out.add("");
         }
+        for (MailContent.Row entry : content.rows()) {
+            out.addAll(wrap(plain(entry.title())));
+            out.addAll(wrap("  " + plain(entry.detail())));
+            out.add("");
+        }
         if (content.action() != null) {
             out.add(plain(content.action().label()) + ":");
             // Alone on its line, so no client folds a URL in half.
@@ -316,6 +348,11 @@ public class MailTemplate {
         out.add("-".repeat(TEXT_WIDTH));
         out.addAll(wrap(plain(content.footerReason())));
         out.add("");
+        if (content.unsubscribe() != null) {
+            out.addAll(wrap(plain(content.unsubscribe().label()) + " - " + plain(content.unsubscribe().what())));
+            out.add(content.unsubscribe().url());
+            out.add("");
+        }
         // Spelled out rather than linked: there are no anchors here to hide it in, and the
         // provider still has to be identifiable.
         out.add("Janne Keipert");

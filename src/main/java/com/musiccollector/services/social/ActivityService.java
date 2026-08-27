@@ -222,6 +222,35 @@ public class ActivityService {
         return new ActivityFeedDto(collapse(readable, actors, releases));
     }
 
+    /**
+     * What one viewer is allowed to see from the last stretch — the Sunday digest's window.
+     *
+     * <p>Visibility is applied here, at send time, exactly as it is for the feed. That is
+     * the whole reason the digest reads through this service rather than the repository: a
+     * shelf closed on Saturday must not turn up in Sunday's mail, and a mail is the one copy
+     * of a claim that cannot be taken back.
+     *
+     * <p>Only what somebody put on a shelf. Accepted requests are personal news and belong
+     * in the feed, not in a summary about other people's records; wishes are not records.
+     */
+    @Transactional(readOnly = true)
+    public List<ActivityEntryDto> since(UUID viewerId, Collection<UUID> friendIds, Instant since) {
+        if (friendIds.isEmpty()) {
+            return List.of();
+        }
+        List<ActivityEventEntity> events = activityRepository
+                .feedSince(List.copyOf(friendIds), since, PageRequest.of(0, SCAN_SIZE))
+                .stream()
+                .filter(event -> event.getType() == ActivityType.COPY_ADDED
+                        || event.getType() == ActivityType.WISH_FULFILLED)
+                .filter(event -> mayRead(viewerId, event))
+                .toList();
+
+        Map<UUID, UserEntity> actors = actorsOf(events);
+        Map<String, ReleaseEntity> releases = releasesOf(events);
+        return collapse(events, actors, releases);
+    }
+
     private boolean mayRead(UUID viewerId, ActivityEventEntity event) {
         return switch (event.getType()) {
             // Somebody's own news, and only theirs. An accepted request is not activity

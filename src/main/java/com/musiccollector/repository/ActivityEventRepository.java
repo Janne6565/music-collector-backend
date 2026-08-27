@@ -27,6 +27,23 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEventEnti
             """)
     List<ActivityEventEntity> feedFor(@Param("actorIds") Collection<UUID> actorIds, Pageable pageable);
 
+    /**
+     * The same read, bounded to a window — what the Sunday digest covers.
+     *
+     * <p>Bounded in the query rather than filtered afterwards: a week is a handful of rows
+     * for most people and the whole history for nobody, and reading everything to throw
+     * most of it away gets worse every year the app exists.
+     */
+    @Query("""
+            SELECT e FROM ActivityEventEntity e
+            WHERE e.actorId IN :actorIds AND e.occurredAt >= :since
+            ORDER BY e.occurredAt DESC, e.recordedAt DESC
+            """)
+    List<ActivityEventEntity> feedSince(
+            @Param("actorIds") Collection<UUID> actorIds,
+            @Param("since") java.time.Instant since,
+            Pageable pageable);
+
     boolean existsByActorIdAndTypeAndSubjectId(UUID actorId, ActivityType type, UUID subjectId);
 
     void deleteAllByActorIdAndSubjectId(UUID actorId, UUID subjectId);
