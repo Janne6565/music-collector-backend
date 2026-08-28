@@ -248,7 +248,7 @@ public class MailTemplate {
         String stop = unsubscribe == null
                 ? ""
                 : ("<div class=\"mc-mono-body\" style=\"font:400 12.5px/1.62 %s;color:%s;padding-top:8px\">"
-                                + "<a class=\"mc-link\" href=\"%s\" style=\"color:%s\">%s</a> — %s</div>")
+                                + "<a class=\"mc-link\" href=\"%s\" style=\"color:%s\">%s</a> · %s</div>")
                         .formatted(SANS, MUTED, esc(unsubscribe.url()), ACCENT_STRONG, esc(unsubscribe.label()),
                                 esc(unsubscribe.what()));
 

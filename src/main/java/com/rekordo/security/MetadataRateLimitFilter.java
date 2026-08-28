@@ -64,7 +64,7 @@ public class MetadataRateLimitFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.getWriter().write("""
                 {"type":"about:blank","title":"Too Many Requests","status":429,\
-                "detail":"Too many metadata requests — slow down and retry shortly."}""");
+                "detail":"Too many metadata requests. Slow down and retry shortly."}""");
     }
 
     private Bucket newBucket() {

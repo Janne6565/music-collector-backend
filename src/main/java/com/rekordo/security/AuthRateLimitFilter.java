@@ -80,7 +80,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.getWriter().write("""
                 {"type":"about:blank","title":"Too Many Requests","status":429,\
-                "detail":"Too many sign-in attempts — wait a while before trying again."}""");
+                "detail":"Too many sign-in attempts. Wait a while before trying again."}""");
     }
 
     /**

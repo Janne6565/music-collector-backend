@@ -49,7 +49,7 @@ public class AccountMailer {
                                 .formatted(recipient))
                         .action("Choose a new password", template.publicUrl() + "/reset?token=" + token)
                         .note("The link works once and expires an hour after it was sent. If this wasn’t you, "
-                                + "nothing has changed — your password still works and no one can reach the "
+                                + "nothing has changed. Your password still works and no one can reach the "
                                 + "account without this mail.")
                         .reason("You are receiving this because someone requested a password reset for this address.")
                         .build());
@@ -65,7 +65,7 @@ public class AccountMailer {
                                 .formatted(recipient))
                         .action("Confirm this address", template.publicUrl() + "/confirm/" + token)
                         .note("The link expires in 24 hours. If it runs out, ask for a new one on your Account "
-                                + "screen. Your collection, wishlist and photos sync either way — confirming "
+                                + "screen. Your collection, wishlist and photos sync either way. Confirming "
                                 + "protects the account rather than unlocking it.")
                         .reason("You are receiving this because this address was entered for a Rekordo "
                                 + "account.")
@@ -83,7 +83,7 @@ public class AccountMailer {
                 recipient,
                 MailContent.builder("Confirm your new e-mail address", "Confirm your new address")
                         .paragraph(("Somebody asked to move a Rekordo account to %s. One click and it is "
-                                        + "yours — until then the old address goes on working, so nothing is lost "
+                                        + "yours. Until then the old address goes on working, so nothing is lost "
                                         + "if this was not you.")
                                 .formatted(recipient))
                         .action("Confirm this address", template.publicUrl() + "/confirm/" + token)
@@ -143,9 +143,9 @@ public class AccountMailer {
                         .fact(STAMP.format(at))
                         .note(
                                 "If you didn’t change it",
-                                "Reset the password yourself — that locks out anything still holding the old one "
+                                "Reset the password yourself. That locks out anything still holding the old one "
                                         + "and signs every device out again.",
-                                "This wasn’t me — secure my account",
+                                "This wasn’t me, secure my account",
                                 template.publicUrl() + "/forgot",
                                 true)
                         .reason("You are receiving this because your Rekordo password changed. Security "
@@ -166,7 +166,7 @@ public class AccountMailer {
                         .note(
                                 null,
                                 "Sign-in methods are listed on your Account screen. If you didn’t link this one, "
-                                        + "change your password straight away — whoever did can otherwise sign in "
+                                        + "change your password straight away. Whoever did can otherwise sign in "
                                         + "without it.",
                                 "This wasn’t me",
                                 template.publicUrl() + "/forgot",
@@ -191,7 +191,7 @@ public class AccountMailer {
                                                 + "is kept for later.")
                                         .formatted(recipient, copies == 1 ? "1 copy" : copies + " copies"))
                         .note("The rows and the photo files went as the account did, not into a queue to be tidied "
-                                + "up later. This address is free to sign up with again whenever you like — you "
+                                + "up later. This address is free to sign up with again whenever you like, though you "
                                 + "would start from an empty shelf.")
                         .closing("Thank you for keeping your records with us.")
                         .reason("You are receiving this because the account for this address was deleted. It is the "

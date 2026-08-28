@@ -65,7 +65,7 @@ public class ProfileSearchRateLimitFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.getWriter().write("""
                 {"type":"about:blank","title":"Too Many Requests","status":429,\
-                "detail":"Too many searches — slow down and retry shortly."}""");
+                "detail":"Too many searches. Slow down and retry shortly."}""");
     }
 
     private Bucket newBucket() {
