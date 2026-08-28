@@ -323,7 +323,13 @@ public class SyncService {
                 activityService.forget(userId, id);
             } else if (created) {
                 activityService.recordWishAdded(
-                        userId, id, merged.albumId(), merged.title(), merged.artistName(), merged.createdAt());
+                        userId,
+                        id,
+                        merged.albumId(),
+                        merged.title(),
+                        merged.artistName(),
+                        merged.desiredFormat(),
+                        merged.createdAt());
             }
 
             highWaterMark = Math.max(highWaterMark, target.getSyncSeq());

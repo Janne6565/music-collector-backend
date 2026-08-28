@@ -8,12 +8,14 @@ import com.rekordo.model.core.ActivityEntryDto;
 import com.rekordo.model.core.ActivityFeedDto;
 import com.rekordo.model.core.ActivityType;
 import com.rekordo.model.core.CopyOrigin;
+import com.rekordo.model.core.Format;
 import com.rekordo.repository.ActivityEventRepository;
 import com.rekordo.repository.CopyRepository;
 import com.rekordo.repository.ReleaseGroupRepository;
 import com.rekordo.repository.ReleaseRepository;
 import com.rekordo.repository.WishlistItemRepository;
 import com.rekordo.repository.UserRepository;
+import com.rekordo.services.metadata.MetadataService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,6 +75,7 @@ public class ActivityService {
     private final WishlistItemRepository wishlistItemRepository;
     private final UserRepository userRepository;
     private final VisibilityService visibilityService;
+    private final MetadataService metadataService;
 
     /**
      * Record that a copy was added by hand.
@@ -98,7 +101,7 @@ public class ActivityService {
         // "Off the wishlist, onto the shelf" is a better line than "added a copy", and it is
         // the same event -- so which one this is depends on whether they were hunting for it.
         ActivityType type = wasWishedFor(actorId, releaseId) ? ActivityType.WISH_FULFILLED : ActivityType.COPY_ADDED;
-        save(actorId, type, copyId, releaseId, title, artist, occurredAt);
+        save(actorId, type, copyId, releaseId, title, artist, null, occurredAt);
     }
 
     /**
@@ -122,12 +125,25 @@ public class ActivityService {
                 .orElse(false);
     }
 
+    /**
+     * @param wantedFormat the format being hunted for, or null for a wish that wants any.
+     *                     Stored on the line because an album has no format of its own —
+     *                     without it the feed can say what somebody is looking for but not
+     *                     draw it.
+     */
     @Transactional
-    public void recordWishAdded(UUID actorId, UUID wishId, String albumId, String title, String artist, Long occurredAt) {
+    public void recordWishAdded(
+            UUID actorId,
+            UUID wishId,
+            String albumId,
+            String title,
+            String artist,
+            String wantedFormat,
+            Long occurredAt) {
         if (activityRepository.existsByActorIdAndTypeAndSubjectId(actorId, ActivityType.WISH_ADDED, wishId)) {
             return;
         }
-        save(actorId, ActivityType.WISH_ADDED, wishId, albumId, title, artist, occurredAt);
+        save(actorId, ActivityType.WISH_ADDED, wishId, albumId, title, artist, wantedFormat, occurredAt);
     }
 
     @Transactional
@@ -136,7 +152,7 @@ public class ActivityService {
                 actorId, ActivityType.FRIENDSHIP_ACCEPTED, otherId)) {
             return;
         }
-        save(actorId, ActivityType.FRIENDSHIP_ACCEPTED, otherId, null, null, null, null);
+        save(actorId, ActivityType.FRIENDSHIP_ACCEPTED, otherId, null, null, null, null, null);
     }
 
     /**
@@ -151,7 +167,14 @@ public class ActivityService {
     }
 
     private void save(
-            UUID actorId, ActivityType type, UUID subjectId, String releaseId, String title, String artist, Long occurredAt) {
+            UUID actorId,
+            ActivityType type,
+            UUID subjectId,
+            String releaseId,
+            String title,
+            String artist,
+            String wantedFormat,
+            Long occurredAt) {
         Instant now = Instant.now();
         // A copy typed in by hand carries its own title; a matched one carries none, and the
         // name comes from the mirror. Resolved once, here, rather than on every read -- the
@@ -172,6 +195,7 @@ public class ActivityService {
         event.setReleaseId(releaseId);
         event.setTitle(title);
         event.setArtistName(artist);
+        event.setWantedFormat(wantedFormat);
         event.setOccurredAt(clamp(occurredAt, now));
         event.setRecordedAt(now);
         activityRepository.save(event);
@@ -219,7 +243,7 @@ public class ActivityService {
 
         Map<UUID, UserEntity> actors = actorsOf(readable);
         Map<String, ReleaseEntity> releases = releasesOf(readable);
-        return new ActivityFeedDto(collapse(readable, actors, releases));
+        return new ActivityFeedDto(collapse(readable, actors, releases, albumCoversOf(readable)));
     }
 
     /**
@@ -248,7 +272,7 @@ public class ActivityService {
 
         Map<UUID, UserEntity> actors = actorsOf(events);
         Map<String, ReleaseEntity> releases = releasesOf(events);
-        return collapse(events, actors, releases);
+        return collapse(events, actors, releases, albumCoversOf(events));
     }
 
     private boolean mayRead(UUID viewerId, ActivityEventEntity event) {
@@ -288,7 +312,10 @@ public class ActivityService {
      * change without a migration.
      */
     private List<ActivityEntryDto> collapse(
-            List<ActivityEventEntity> events, Map<UUID, UserEntity> actors, Map<String, ReleaseEntity> releases) {
+            List<ActivityEventEntity> events,
+            Map<UUID, UserEntity> actors,
+            Map<String, ReleaseEntity> releases,
+            Map<String, String> albumCovers) {
         List<ActivityEntryDto> entries = new ArrayList<>();
         int index = 0;
         while (index < events.size() && entries.size() < FEED_SIZE) {
@@ -305,7 +332,7 @@ public class ActivityService {
                 }
             }
             List<ActivityEventEntity> group = events.subList(index, end);
-            entries.add(toDto(head, group, actors, releases));
+            entries.add(toDto(head, group, actors, releases, albumCovers));
             index = end;
         }
         return entries;
@@ -315,12 +342,13 @@ public class ActivityService {
             ActivityEventEntity head,
             List<ActivityEventEntity> group,
             Map<UUID, UserEntity> actors,
-            Map<String, ReleaseEntity> releases) {
+            Map<String, ReleaseEntity> releases,
+            Map<String, String> albumCovers) {
         ReleaseEntity release = head.getReleaseId() == null ? null : releases.get(head.getReleaseId());
         List<String> covers = group.size() > 1
                 ? group.stream()
                         .limit(COLLAPSED_COVERS)
-                        .map(event -> coverOf(event, releases))
+                        .map(event -> coverOf(event, releases, albumCovers))
                         .filter(url -> url != null)
                         .toList()
                 : List.of();
@@ -331,9 +359,9 @@ public class ActivityService {
                 head.getTitle(),
                 head.getArtistName(),
                 head.getReleaseId(),
-                release == null ? null : release.getFormat(),
+                formatOf(head, release),
                 release == null ? null : release.getYear(),
-                coverOf(head, releases),
+                coverOf(head, releases, albumCovers),
                 head.getOccurredAt(),
                 group.size(),
                 covers);
@@ -346,12 +374,65 @@ public class ActivityService {
                 : new ActivityActorDto(actor.getId(), actor.getHandle(), actor.getDisplayName());
     }
 
-    private String coverOf(ActivityEventEntity event, Map<String, ReleaseEntity> releases) {
+    /**
+     * The picture for one line.
+     *
+     * <p>Two lookups, because a WISH_ADDED line stores an <em>album</em> id where every
+     * other type stores a pressing's. Looking an album up in the release mirror never
+     * matches, which is why every wish line drew a blank tile: not a missing cover, a
+     * lookup in the wrong table.
+     */
+    private String coverOf(
+            ActivityEventEntity event, Map<String, ReleaseEntity> releases, Map<String, String> albumCovers) {
+        if (event.getType() == ActivityType.WISH_ADDED) {
+            return event.getReleaseId() == null ? null : albumCovers.get(event.getReleaseId());
+        }
         ReleaseEntity release = event.getReleaseId() == null ? null : releases.get(event.getReleaseId());
         if (release == null || Boolean.FALSE.equals(release.getHasCoverArt())) {
             return null;
         }
         return release.getCoverArtUrl();
+    }
+
+    /**
+     * The format the tile should draw.
+     *
+     * <p>A wish is a want for an album in a format, so the line's format is the one being
+     * hunted for rather than any pressing's — the entry for the vinyl of a record they
+     * already own on CD should look like the thing they are after. Null for a wish that
+     * wants any, and for a format this build does not know: the tile falls back to its
+     * no-format placeholder, which is what it drew before either way.
+     */
+    private Format formatOf(ActivityEventEntity event, ReleaseEntity release) {
+        if (event.getType() != ActivityType.WISH_ADDED) {
+            return release == null ? null : release.getFormat();
+        }
+        String wanted = event.getWantedFormat();
+        if (wanted == null || wanted.isBlank()) {
+            return null;
+        }
+        try {
+            return Format.valueOf(wanted);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Album covers for the wish lines in one page, resolved without going upstream.
+     *
+     * <p>The feed is a read, and a page of unknown albums must not become a page of paced
+     * catalogue calls with somebody waiting. What the mirror holds is answered at once and
+     * the rest heal when a wishlist screen asks for them properly.
+     */
+    private Map<String, String> albumCoversOf(List<ActivityEventEntity> events) {
+        Set<String> ids = new HashSet<>();
+        for (ActivityEventEntity event : events) {
+            if (event.getType() == ActivityType.WISH_ADDED && event.getReleaseId() != null) {
+                ids.add(event.getReleaseId());
+            }
+        }
+        return ids.isEmpty() ? Map.of() : metadataService.mirroredAlbumCovers(ids);
     }
 
     private static boolean isBlank(String value) {

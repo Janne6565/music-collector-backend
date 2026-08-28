@@ -4,6 +4,7 @@ import com.rekordo.entity.ActivityEventEntity;
 import com.rekordo.entity.CopyEntity;
 import com.rekordo.entity.UserEntity;
 import com.rekordo.model.core.ActivityEntryDto;
+import com.rekordo.model.core.Format;
 import com.rekordo.model.core.ActivityType;
 import com.rekordo.model.core.CopyOrigin;
 import com.rekordo.repository.ActivityEventRepository;
@@ -12,6 +13,7 @@ import com.rekordo.repository.ReleaseGroupRepository;
 import com.rekordo.repository.ReleaseRepository;
 import com.rekordo.repository.UserRepository;
 import com.rekordo.repository.WishlistItemRepository;
+import com.rekordo.services.metadata.MetadataService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,6 +29,7 @@ import org.mockito.quality.Strictness;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,6 +53,7 @@ class ActivityServiceTest {
     @Mock private WishlistItemRepository wishlistItemRepository;
     @Mock private UserRepository userRepository;
     @Mock private VisibilityService visibilityService;
+    @Mock private MetadataService metadataService;
 
     @InjectMocks private ActivityService service;
 
@@ -216,6 +220,56 @@ class ActivityServiceTest {
         entity.setOccurredAt(occurredAt);
         entity.setRecordedAt(occurredAt);
         return entity;
+    }
+
+    @Test
+    void findsTheCoverForAWishByLookingTheAlbumUpRatherThanThePressing() {
+        /*
+         * A wish line stores an *album* id where every other type stores a pressing's, and
+         * the release mirror is keyed by pressing. Looking one up in the other never
+         * matched, so every "is looking for" line in the feed drew a blank tile.
+         */
+        ActivityEventEntity wish = event(ActivityType.WISH_ADDED, "Hadestown", Instant.now());
+        wish.setReleaseId("musicbrainz:g-hadestown");
+        when(activityRepository.feedFor(any(), any())).thenReturn(List.of(wish));
+        when(metadataService.mirroredAlbumCovers(any()))
+                .thenReturn(Map.of("musicbrainz:g-hadestown", "https://covers.example/hadestown.jpg"));
+
+        ActivityEntryDto entry = service.feed(VIEWER, List.of(FRIEND)).entries().getFirst();
+
+        assertThat(entry.coverArtUrl()).isEqualTo("https://covers.example/hadestown.jpg");
+    }
+
+    @Test
+    void drawsAWishInTheFormatItIsBeingHuntedIn() {
+        // An album has no format -- the wish does. Without it the line could say what
+        // somebody was looking for but not draw the thing they were looking for.
+        ActivityEventEntity wish = event(ActivityType.WISH_ADDED, "Hadestown", Instant.now());
+        wish.setWantedFormat("CASSETTE");
+        when(activityRepository.feedFor(any(), any())).thenReturn(List.of(wish));
+
+        ActivityEntryDto entry = service.feed(VIEWER, List.of(FRIEND)).entries().getFirst();
+
+        assertThat(entry.format()).isEqualTo(Format.CASSETTE);
+    }
+
+    @Test
+    void leavesTheFormatOffAWishThatWantsAny() {
+        ActivityEventEntity wish = event(ActivityType.WISH_ADDED, "Hadestown", Instant.now());
+        wish.setWantedFormat(null);
+        when(activityRepository.feedFor(any(), any())).thenReturn(List.of(wish));
+
+        ActivityEntryDto entry = service.feed(VIEWER, List.of(FRIEND)).entries().getFirst();
+
+        assertThat(entry.format()).isNull();
+    }
+
+    @Test
+    void keepsTheWantedFormatOnTheLineItRecords() {
+        service.recordWishAdded(
+                FRIEND, UUID.randomUUID(), "musicbrainz:g1", "Hadestown", "Ana\u00efs Mitchell", "VINYL", 1L);
+
+        assertThat(saved().getWantedFormat()).isEqualTo("VINYL");
     }
 
     private ActivityEventEntity saved() {

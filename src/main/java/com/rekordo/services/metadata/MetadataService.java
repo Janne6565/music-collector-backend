@@ -314,6 +314,50 @@ public class MetadataService {
     }
 
     /**
+     * Album covers that cost nothing to answer: no upstream call, and no write.
+     *
+     * <p>The sibling of {@link #albumCovers}, for callers inside a read-only transaction —
+     * the Friends feed, which has to draw a page of wish lines without blocking on a
+     * catalogue paced at tens of requests a minute. The mirror first, then the Cover Art
+     * Archive's address for a MusicBrainz album, which is built from the group id and so
+     * costs nothing and cannot fail. A Discogs album the mirror has never seen answers
+     * null and heals the next time a client asks {@code /albums/covers} for it, which the
+     * wishlist screens already do.
+     *
+     * @return asked-for id to cover URL, with no entry where nothing known has one
+     */
+    @Transactional(readOnly = true)
+    public Map<String, String> mirroredAlbumCovers(Collection<String> albumIds) {
+        Map<String, String> wanted = new LinkedHashMap<>();
+        for (String albumId : albumIds) {
+            if (albumId == null || albumId.isBlank() || albumId.startsWith(MANUAL_PREFIX)) {
+                continue;
+            }
+            wanted.putIfAbsent(albumId, ExternalRef.parse(albumId).toString());
+        }
+        if (wanted.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, ReleaseGroupEntity> groups = new HashMap<>();
+        for (ReleaseGroupEntity group : releaseGroupRepository.findAllByExternalIdIn(wanted.values())) {
+            groups.put(group.getExternalId(), group);
+        }
+        Map<UUID, String> mirrored = mirroredCovers(groups.values());
+
+        Map<String, String> covers = new HashMap<>();
+        wanted.forEach((asked, ref) -> {
+            ReleaseGroupEntity group = groups.get(ref);
+            String cover = group == null ? null : mirrored.get(group.getId());
+            String answer = cover != null ? cover : archiveCover(ref);
+            if (answer != null) {
+                covers.put(asked, answer);
+            }
+        });
+        return covers;
+    }
+
+    /**
      * How many albums one request may go upstream for.
      *
      * Small on purpose. This is an open, unauthenticated endpoint in front of a catalogue

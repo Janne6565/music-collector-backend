@@ -51,6 +51,18 @@ public class ActivityEventEntity {
     @Column(name = "artist_name")
     private String artistName;
 
+    /**
+     * The format a WISH_ADDED line was hunting for, or null on every other type and on a
+     * wish that wants any.
+     *
+     * <p>A string rather than an enum, as {@code wishlist_items} stores it: what a wish
+     * wants is a subset of the copy formats, and mapping it through {@link
+     * com.rekordo.model.core.Format} here would put a check constraint on the column that
+     * a later format would have to migrate around.
+     */
+    @Column(name = "wanted_format")
+    private String wantedFormat;
+
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
 
