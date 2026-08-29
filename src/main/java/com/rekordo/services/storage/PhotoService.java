@@ -38,6 +38,7 @@ public class PhotoService {
     private final PhotoRepository photoRepository;
     private final CopyRepository copyRepository;
     private final StorageService storageService;
+    private final StorageUsageService storageUsageService;
     private final StorageProperties properties;
     private final VisibilityService visibilityService;
 
@@ -58,9 +59,18 @@ public class PhotoService {
         if (contentType == null || !ALLOWED_TYPES.contains(contentType.toLowerCase())) {
             throw new UnsupportedPhotoTypeException(String.valueOf(contentType));
         }
-        if (file.getSize() > properties.maxUploadBytes()) {
-            throw new PhotoTooLargeException(properties.maxUploadBytes());
+        if (file.getSize() > properties.maxPhotoBytes()) {
+            throw new PhotoTooLargeException(properties.maxPhotoBytes());
         }
+
+        // Both refusals happen before the object is written, and this one needs the row the
+        // id may already have: re-uploading a photo overwrites its object rather than adding
+        // one, so what it costs is the difference, not the whole file.
+        PhotoEntity existing = photoRepository.findById(photoId).orElse(null);
+        long replacing = existing == null || existing.getStorageKey() == null || existing.getByteSize() == null
+                ? 0L
+                : existing.getByteSize();
+        storageUsageService.requireRoom(userId, file.getSize(), replacing);
 
         // Namespaced by user so one account's objects are never confusable with another's,
         // even if an id were somehow reused.
@@ -71,7 +81,7 @@ public class PhotoService {
             throw new com.rekordo.model.exception.StorageUnavailableException("read upload", e);
         }
 
-        PhotoEntity entity = photoRepository.findById(photoId).orElseGet(PhotoEntity::new);
+        PhotoEntity entity = existing == null ? new PhotoEntity() : existing;
         entity.setId(photoId);
         entity.setUserId(userId);
         entity.setCopyId(copyId);

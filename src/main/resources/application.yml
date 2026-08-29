@@ -88,9 +88,18 @@ rekordo:
     access-key: ${MC_MINIO_ACCESS_KEY:musiccollector}
     secret-key: ${MC_MINIO_SECRET_KEY:musiccollector-secret}
     bucket: ${MC_MINIO_BUCKET:music-collector-photos}
-    # A phone photo is a couple of megabytes; 15 leaves room for a large one without
-    # letting the endpoint be used as free object storage.
+    # The profile picture arrives at full resolution -- the client re-encodes it upright
+    # but does not shrink it, because the server renders the 512px circle itself. 15 MB
+    # leaves room for a large phone photo without letting the endpoint be free storage.
     max-upload-bytes: 15728640
+    # A sleeve photo is scaled to 1600px by both clients before it is offered, which puts a
+    # normal one around 300 kB. 5 MB is generous for that and still refuses an original
+    # from an older app version early rather than after it has eaten a quarter of a quota.
+    max-photo-bytes: 5242880
+    # 20 MB per account: roughly sixty-five sleeve photos at the size the clients produce,
+    # which is more than a real shelf ever has pictured, and a firm ceiling on what one
+    # sign-up can cost.
+    quota-bytes: 20971520
   musicbrainz:
     base-url: https://musicbrainz.org/ws/2
     cover-art-base-url: https://coverartarchive.org

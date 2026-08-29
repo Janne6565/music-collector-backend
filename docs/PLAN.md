@@ -731,3 +731,66 @@ something real: a 12 MB photo on a phone connection.
 - The picture does not appear in the transactional mails' header.
 - No report path for a stranger's picture on a public page.
 - Dark mode, where the hairline would flip to white ink.
+
+## The storage allowance
+
+A cap on what one account may keep in object storage, and a meter that says how much of it
+is gone. Not yet designed — the screens are the open item at the end of this section.
+
+Twenty megabytes. That number only works because of the other half of the turn: until now
+neither client scaled a chosen picture, so a sleeve photographed on a phone was three or
+four megabytes and one off a camera was fifteen, and twenty megabytes would have been six
+pictures. Scaled to a 1600px long edge at quality 0.82 a sleeve photo is about 300 kB, and
+the same allowance is around sixty-five of them.
+
+### Decisions
+
+| Question | Decision |
+|---|---|
+| What counts | Sleeve photos not deleted, plus the rendered profile picture. Cover art never — it is fetched at display time and never stored |
+| How much | 20 MB, in `rekordo.storage.quota-bytes`. Configuration, not a constant |
+| Counted from where | The database, not a bucket walk. An account is answerable for what it stored, not for bytes a failed delete left behind |
+| When it is checked | Before the object is written, on both upload paths. An object no row references is storage nothing will ever reclaim |
+| What the avatar costs | The rendered 512px JPEG, not the original that produced it. About 50 kB whatever arrives |
+| Replacing a picture | Charged the difference. Both paths write to a key derived from an id, so the old object is gone the moment the new one lands |
+| Already over the line | Nothing is deleted on anybody's behalf. They cannot add until they delete |
+| The refusal | `507`, not the `413` an oversized file gets. "Too big" is fixed by choosing another picture and "no room" by deleting one; a client that cannot tell them apart gives the wrong advice half the time |
+| Long edge | 1600px. The largest a photo is ever drawn is the full-width hero on a phone at 3× — about 1170px — and 1600 leaves room for a pinch |
+| Quality | 0.82. Below about 0.75 the lettering on a spine starts to ring |
+
+### Two ceilings, not one
+
+`max-upload-bytes` (15 MB) is the profile picture's, and it stays where it was: the clients
+send that one at full resolution because the server is what renders the circle, and a JPEG
+transcoded from a 12-megapixel HEIC is several megabytes on its own.
+
+`max-photo-bytes` (5 MB) is the sleeve photo's. Nothing the clients now produce comes close,
+so what it actually catches is an older app version's original — early, rather than after it
+has eaten a quarter of somebody's allowance.
+
+### Why the clients scale rather than the server
+
+What is stored on the device is what is uploaded, so one photo id is one picture at one size
+everywhere, and sync never has to reconcile two versions of it. The same reasoning as the
+profile picture's framing step, for the same reason.
+
+It also fixes something that was quietly broken: the iOS picker returns HEIC's bytes
+untouched whatever `quality` says, and HEIC is a format the web app cannot draw — so a
+sleeve photographed on a phone was a broken tile in the browser. What leaves the phone is
+now always a JPEG.
+
+A file the browser cannot decode (a HEIC outside Safari) is stored as it arrived. Dropping a
+picture somebody chose would be worse than storing a large one.
+
+### Open
+
+- **The screens.** There is no meter anywhere yet: `GET /api/v1/account/storage` answers, and
+  nothing draws it. Account's Storage card is where it goes.
+- **A refused upload is silent.** `SyncEngine.uploadPendingPhotos` swallows every failure and
+  retries on the next pass, which is right for a flat tyre and wrong for a full account: the
+  photo shows on the device that took it, is on no other, and nothing says so. The over-quota
+  state needs somewhere to live in the photo strip.
+- **Nothing counts a refusal.** `rekordo.storage.quota.refused` would be the series that says
+  whether 20 MB is the right number, next to the gauges `StorageMetrics` already publishes.
+- **Existing photos stay at their original size.** There is no re-compress path, so an account
+  filled by an older version stays full until it deletes something.

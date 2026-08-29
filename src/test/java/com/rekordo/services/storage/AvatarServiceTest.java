@@ -6,6 +6,7 @@ import com.rekordo.model.core.AvatarCropDto;
 import com.rekordo.model.core.AvatarDto;
 import com.rekordo.model.exception.AvatarNotFoundException;
 import com.rekordo.model.exception.PhotoTooLargeException;
+import com.rekordo.model.exception.StorageQuotaExceededException;
 import com.rekordo.model.exception.UnsupportedPhotoTypeException;
 import com.rekordo.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,16 +44,21 @@ class AvatarServiceTest {
 
     private static final UUID USER = UUID.randomUUID();
     private static final long MAX_BYTES = 15_728_640;
+    private static final long QUOTA_BYTES = 20_971_520;
 
     @Mock private UserRepository userRepository;
     @Mock private StorageService storageService;
+    @Mock private StorageUsageService storageUsageService;
 
     private AvatarService service;
 
     @BeforeEach
     void setUp() {
         service = new AvatarService(
-                userRepository, storageService, new StorageProperties("http://s", "a", "b", "bucket", MAX_BYTES));
+                userRepository,
+                storageService,
+                storageUsageService,
+                new StorageProperties("http://s", "a", "b", "bucket", MAX_BYTES, MAX_BYTES, QUOTA_BYTES));
     }
 
     @Test
@@ -110,6 +116,33 @@ class AvatarServiceTest {
     }
 
     @Test
+    void chargesTheAccountForTheRenderedPictureRatherThanTheOneThatArrived() {
+        // What the bucket holds is the 512px JPEG, and that is what the allowance is spent
+        // on. A four-megapixel original that renders to fifty kilobytes costs fifty kilobytes.
+        UserEntity user = user();
+        when(userRepository.findById(USER)).thenReturn(Optional.of(user));
+
+        service.upload(USER, file(picture(64, 64, 64), "image/png"), new AvatarCropDto(0, 0, 64));
+
+        long stored = captureStored().length;
+        assertThat(user.getAvatarBytes()).isEqualTo(stored);
+        verify(storageUsageService).requireRoom(USER, stored, 0L);
+    }
+
+    @Test
+    void refusesAPictureThatWouldNotFitInWhatIsLeft() {
+        when(userRepository.findById(USER)).thenReturn(Optional.of(user()));
+        org.mockito.Mockito.doThrow(new StorageQuotaExceededException(QUOTA_BYTES, QUOTA_BYTES))
+                .when(storageUsageService)
+                .requireRoom(eq(USER), anyLong(), anyLong());
+
+        assertThatThrownBy(() -> service.upload(
+                        USER, file(picture(64, 64, 64), "image/png"), new AvatarCropDto(0, 0, 64)))
+                .isInstanceOf(StorageQuotaExceededException.class);
+        verify(storageService, never()).put(any(), any(), anyLong(), any());
+    }
+
+    @Test
     void refusesAFileThatIsNotAPictureThisAppRenders() {
         assertThatThrownBy(() -> service.upload(
                         USER, file("not a picture".getBytes(), "application/pdf"), new AvatarCropDto(0, 0, 10)))
@@ -150,6 +183,7 @@ class AvatarServiceTest {
         service.remove(USER);
 
         assertThat(user.getAvatarKey()).isNull();
+        assertThat(user.getAvatarBytes()).isNull();
         assertThat(user.getAvatarUpdatedAt()).isNull();
         verify(storageService).delete("avatars/" + USER);
     }

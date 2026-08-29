@@ -60,6 +60,15 @@ public class UserEntity {
     private Instant avatarUpdatedAt;
 
     /**
+     * What the rendered picture weighs in object storage, or null for one written before
+     * the column existed. It is the only stored object an account owns that has no row of
+     * its own to be measured from, and the storage allowance has to add it up with the
+     * rest.
+     */
+    @Column(name = "avatar_bytes")
+    private Long avatarBytes;
+
+    /**
      * When the address was proved reachable, or null while it has not been. Nothing is gated
      * on it -- see EmailVerificationService for why -- so it is a fact about the mailbox
      * rather than a permission.

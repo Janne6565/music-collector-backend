@@ -6,6 +6,7 @@ import com.rekordo.model.core.PhotoUploadDto;
 import com.rekordo.model.exception.PhotoNotFoundException;
 import com.rekordo.model.exception.PhotoOwnerRequiredException;
 import com.rekordo.model.exception.PhotoTooLargeException;
+import com.rekordo.model.exception.StorageQuotaExceededException;
 import com.rekordo.model.exception.UnsupportedPhotoTypeException;
 import com.rekordo.entity.CopyEntity;
 import com.rekordo.repository.CopyRepository;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -41,10 +43,12 @@ class PhotoServiceTest {
     private static final UUID WISH = UUID.randomUUID();
     private static final UUID STRANGER = UUID.randomUUID();
     private static final long MAX_BYTES = 1_000_000;
+    private static final long QUOTA_BYTES = 20_971_520;
 
     @Mock private PhotoRepository photoRepository;
     @Mock private CopyRepository copyRepository;
     @Mock private StorageService storageService;
+    @Mock private StorageUsageService storageUsageService;
     @Mock private VisibilityService visibilityService;
 
     private PhotoService service;
@@ -55,7 +59,8 @@ class PhotoServiceTest {
                 photoRepository,
                 copyRepository,
                 storageService,
-                new StorageProperties("http://localhost:9000", "a", "b", "bucket", MAX_BYTES),
+                storageUsageService,
+                new StorageProperties("http://localhost:9000", "a", "b", "bucket", MAX_BYTES, MAX_BYTES, QUOTA_BYTES),
                 visibilityService);
     }
 
@@ -92,6 +97,35 @@ class PhotoServiceTest {
                 .isInstanceOf(PhotoTooLargeException.class);
 
         verify(storageService, never()).put(any(), any(), anyLong(), any());
+    }
+
+    @Test
+    void refusesAnUploadThatWouldTakeTheAccountPastItsAllowance() {
+        // Refused before the object is written, like every other refusal here: an upload the
+        // bucket accepted and no row references is storage nothing will ever reclaim.
+        org.mockito.Mockito.doThrow(new StorageQuotaExceededException(QUOTA_BYTES, QUOTA_BYTES))
+                .when(storageUsageService)
+                .requireRoom(eq(USER), anyLong(), anyLong());
+
+        assertThatThrownBy(() -> service.upload(USER, PHOTO, COPY, null, file("image/jpeg", 128)))
+                .isInstanceOf(StorageQuotaExceededException.class);
+
+        verify(storageService, never()).put(any(), any(), anyLong(), any());
+        verify(photoRepository, never()).save(any());
+    }
+
+    @Test
+    void chargesOnlyTheDifferenceWhenAPhotoIsUploadedOverItself() {
+        // The key is derived from the id, so a second upload overwrites the first rather
+        // than adding to it. Charging for both would refuse a replacement that frees space.
+        PhotoEntity existing = photoOf(USER);
+        existing.setByteSize(900L);
+        when(photoRepository.findById(PHOTO)).thenReturn(Optional.of(existing));
+        when(photoRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.upload(USER, PHOTO, COPY, null, file("image/jpeg", 128));
+
+        verify(storageUsageService).requireRoom(USER, 128L, 900L);
     }
 
     @Test

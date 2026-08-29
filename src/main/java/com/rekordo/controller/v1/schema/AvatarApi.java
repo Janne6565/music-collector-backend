@@ -38,6 +38,7 @@ public interface AvatarApi {
     @ApiResponse(responseCode = "200", description = "Rendered and stored")
     @ApiResponse(responseCode = "401", description = "Not signed in")
     @ApiResponse(responseCode = "413", description = "Too large, or too many pixels to decode")
+    @ApiResponse(responseCode = "507", description = "The account is out of picture storage")
     @ApiResponse(responseCode = "415", description = "Not a picture this app can render")
     @ApiResponse(responseCode = "502", description = "Object storage did not answer; the old picture is unchanged")
     ResponseEntity<AvatarDto> upload(
@@ -53,7 +54,7 @@ public interface AvatarApi {
                     + "there is nothing to report and nothing went wrong.")
     @ApiResponse(responseCode = "204", description = "Removed")
     @ApiResponse(responseCode = "401", description = "Not signed in")
-    ResponseEntity<Void> remove();
+    ResponseEntity<Void> removePicture();
 
     @GetMapping("/{userId}")
     @Operation(

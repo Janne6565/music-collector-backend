@@ -80,6 +80,7 @@ public class AvatarService {
 
     private final UserRepository userRepository;
     private final StorageService storageService;
+    private final StorageUsageService storageUsageService;
     private final StorageProperties properties;
 
     /**
@@ -119,11 +120,22 @@ public class AvatarService {
             throw new UnsupportedPhotoTypeException(String.valueOf(contentType));
         }
 
+        // Checked against the rendered bytes rather than the upload, and therefore after
+        // rendering rather than before: what the account keeps is the 512px JPEG, and
+        // charging it for the four megapixels that produced one would refuse a picture that
+        // costs fifty kilobytes. Replacing a picture writes over the same key, so what the
+        // one already there weighs is not spent twice.
+        storageUsageService.requireRoom(
+                userId, rendered.length, user.getAvatarKey() == null || user.getAvatarBytes() == null
+                        ? 0L
+                        : user.getAvatarBytes());
+
         String key = "avatars/%s".formatted(userId);
         storageService.put(key, new ByteArrayInputStream(rendered), rendered.length, "image/jpeg");
 
         Instant now = Instant.now();
         user.setAvatarKey(key);
+        user.setAvatarBytes((long) rendered.length);
         user.setAvatarUpdatedAt(now);
         user.setUpdatedAt(now);
         userRepository.save(user);
@@ -148,6 +160,7 @@ public class AvatarService {
             return;
         }
         user.setAvatarKey(null);
+        user.setAvatarBytes(null);
         user.setAvatarUpdatedAt(null);
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);

@@ -2,6 +2,7 @@ package com.rekordo.controller.v1.schema;
 
 import com.rekordo.model.core.AccountExportDto;
 import com.rekordo.model.core.ConsentDto;
+import com.rekordo.model.core.StorageUsageDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,4 +44,16 @@ public interface AccountApi {
     @ApiResponse(responseCode = "200", description = "The export, as a file download")
     @ApiResponse(responseCode = "401", description = "Not signed in")
     ResponseEntity<AccountExportDto> export();
+
+    @GetMapping("/storage")
+    @Operation(
+            summary = "How much picture storage this account has used, and how much it has",
+            description = "Sleeve photos and the profile picture, which are the only things a "
+                    + "person uploads. Cover art is fetched from MusicBrainz and Discogs when it "
+                    + "is drawn and never stored, so it costs nothing here. The allowance is the "
+                    + "same number the upload endpoints refuse by, so a client can say no before "
+                    + "sending anything.")
+    @ApiResponse(responseCode = "200", description = "The usage and the allowance")
+    @ApiResponse(responseCode = "401", description = "Not signed in")
+    ResponseEntity<StorageUsageDto> storage();
 }

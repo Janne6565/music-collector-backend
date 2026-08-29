@@ -3,9 +3,11 @@ package com.rekordo.controller.v1.implementation;
 import com.rekordo.controller.v1.schema.AccountApi;
 import com.rekordo.model.core.AccountExportDto;
 import com.rekordo.model.core.ConsentDto;
+import com.rekordo.model.core.StorageUsageDto;
 import com.rekordo.security.CurrentUser;
 import com.rekordo.services.account.AccountExportService;
 import com.rekordo.services.auth.ConsentService;
+import com.rekordo.services.storage.StorageUsageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -22,11 +24,17 @@ public class AccountController implements AccountApi {
 
     private final ConsentService consentService;
     private final AccountExportService accountExportService;
+    private final StorageUsageService storageUsageService;
     private final CurrentUser currentUser;
 
     @Override
     public ResponseEntity<List<ConsentDto>> consents() {
         return ResponseEntity.ok(consentService.list(currentUser.require().getId()));
+    }
+
+    @Override
+    public ResponseEntity<StorageUsageDto> storage() {
+        return ResponseEntity.ok(storageUsageService.usage(currentUser.require().getId()));
     }
 
     @Override

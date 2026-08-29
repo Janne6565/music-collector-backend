@@ -31,7 +31,7 @@ public class AvatarController implements AvatarApi {
     }
 
     @Override
-    public ResponseEntity<Void> remove() {
+    public ResponseEntity<Void> removePicture() {
         avatarService.remove(currentUser.require().getId());
         return ResponseEntity.noContent().build();
     }

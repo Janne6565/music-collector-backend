@@ -37,6 +37,7 @@ public interface PhotoApi {
     @ApiResponse(responseCode = "400", description = "No owner, or two owners")
     @ApiResponse(responseCode = "401", description = "Not signed in")
     @ApiResponse(responseCode = "413", description = "Too large")
+    @ApiResponse(responseCode = "507", description = "The account is out of picture storage")
     @ApiResponse(responseCode = "415", description = "Not an image this app stores")
     ResponseEntity<PhotoUploadDto> upload(
             @RequestParam("photoId") UUID photoId,
