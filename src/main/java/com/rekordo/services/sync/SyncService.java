@@ -253,6 +253,36 @@ public class SyncService {
     }
 
     /**
+     * Every drop counter, at zero, before anything has been dropped.
+     *
+     * <p>A counter that is created on first use does not exist while everything is fine,
+     * and a series that does not exist cannot be charted and cannot be alerted on -- the
+     * panel reads "no data", which looks the same as a panel that is broken. Registering
+     * the whole set up front means the dashboard shows a flat zero, and the flat zero is
+     * the thing worth seeing.
+     */
+    @jakarta.annotation.PostConstruct
+    void registerDropCounters() {
+        for (String kind : List.of("copy", "wish", "photo")) {
+            for (String reason : List.of("malformed_id", "no_created_at", "live_without_storage_key")) {
+                // A photo is the only kind that can be dropped for want of a storage key.
+                if (reason.equals("live_without_storage_key") && !kind.equals("photo")) {
+                    continue;
+                }
+                dropCounter(kind, reason);
+            }
+        }
+    }
+
+    private Counter dropCounter(String kind, String reason) {
+        return Counter.builder("rekordo.sync.push.dropped")
+                .description("Records a push had to throw away because they cannot be stored")
+                .tag("kind", kind)
+                .tag("reason", reason)
+                .register(meterRegistry);
+    }
+
+    /**
      * Records a record thrown away, and says which kind and why.
      *
      * <p>Counted, not only logged. Before this, an unstorable row announced itself as a 500
@@ -264,12 +294,7 @@ public class SyncService {
      */
     private void drop(String kind, String reason, String id) {
         log.warn("Dropping {} {} from push: {}", kind, id, reason);
-        Counter.builder("rekordo.sync.push.dropped")
-                .description("Records a push had to throw away because they cannot be stored")
-                .tag("kind", kind)
-                .tag("reason", reason)
-                .register(meterRegistry)
-                .increment();
+        dropCounter(kind, reason).increment();
     }
 
     /**
