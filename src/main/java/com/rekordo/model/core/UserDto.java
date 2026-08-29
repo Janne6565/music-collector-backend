@@ -9,9 +9,18 @@ import java.util.UUID;
  * @param emailVerified whether the address has been confirmed. A flag rather than the
  *                      timestamp behind it: the client only ever asks yes or no, and the
  *                      date the address was proved is nobody's business but the server's.
+ * @param avatarUrl     where this account's profile picture is, or null when there is
+ *                      none -- which is the ordinary case (27a). Clients draw the initials
+ *                      circle from the name whenever this is absent.
  * @param hasPassword   whether there is a password to ask for. An account made through a
  *                      provider has none, and the change-address screen has to know that
  *                      rather than showing a field nothing could ever be typed into.
  */
 public record UserDto(
-        UUID id, String email, String displayName, Instant createdAt, boolean emailVerified, boolean hasPassword) {}
+        UUID id,
+        String email,
+        String displayName,
+        String avatarUrl,
+        Instant createdAt,
+        boolean emailVerified,
+        boolean hasPassword) {}

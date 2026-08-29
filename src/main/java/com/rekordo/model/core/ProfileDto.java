@@ -15,6 +15,12 @@ public record ProfileDto(
         UUID id,
         String handle,
         String displayName,
+        /**
+         * Their picture, or null. Present whatever the three verdicts below say: the
+         * picture is account data rather than shelf data, so 27f draws it above a
+         * collection that stays locked, and the person who uploaded it was told so.
+         */
+        String avatarUrl,
         RelationshipDto relationship,
         boolean canSeeCollection,
         boolean canSeeWishlist,

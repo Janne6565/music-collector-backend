@@ -45,6 +45,21 @@ public class UserEntity {
     private String handle;
 
     /**
+     * The object key of the profile picture, or null while there is none -- which is the
+     * normal case. Turn 27 offers the picture in one row on Account and asks for it
+     * nowhere, so an account without one is not an account that skipped a step.
+     */
+    @Column(name = "avatar_key")
+    private String avatarKey;
+
+    /**
+     * When the current picture landed. The key does not change when a picture is replaced,
+     * so this is what makes the public URL a different URL and gets past the caches.
+     */
+    @Column(name = "avatar_updated_at")
+    private Instant avatarUpdatedAt;
+
+    /**
      * When the address was proved reachable, or null while it has not been. Nothing is gated
      * on it -- see EmailVerificationService for why -- so it is a fact about the mailbox
      * rather than a permission.

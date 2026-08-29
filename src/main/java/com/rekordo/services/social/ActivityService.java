@@ -16,6 +16,7 @@ import com.rekordo.repository.ReleaseRepository;
 import com.rekordo.repository.WishlistItemRepository;
 import com.rekordo.repository.UserRepository;
 import com.rekordo.services.metadata.MetadataService;
+import com.rekordo.services.storage.AvatarService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -370,8 +371,9 @@ public class ActivityService {
     private ActivityActorDto actorOf(ActivityEventEntity event, Map<UUID, UserEntity> actors) {
         UserEntity actor = actors.get(event.getActorId());
         return actor == null
-                ? new ActivityActorDto(event.getActorId(), null, null)
-                : new ActivityActorDto(actor.getId(), actor.getHandle(), actor.getDisplayName());
+                ? new ActivityActorDto(event.getActorId(), null, null, null)
+                : new ActivityActorDto(
+                        actor.getId(), actor.getHandle(), actor.getDisplayName(), AvatarService.urlFor(actor));
     }
 
     /**

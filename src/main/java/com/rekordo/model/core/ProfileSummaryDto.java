@@ -15,6 +15,8 @@ public record ProfileSummaryDto(
         UUID id,
         String handle,
         String displayName,
+        /** Their picture, or null. Unlike the count, never withheld: it is public. */
+        String avatarUrl,
         Long copyCount,
         RelationshipDto relationship,
         boolean collectionPrivate) {}

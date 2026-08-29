@@ -668,3 +668,66 @@ gap.
 but `users` carries no language, so there is nothing to pick a translation with. A `locale`
 column and a second copy deck is its own turn. Until then the copy blocks are measured for
 German, as the deck was drawn.
+
+## The profile picture (turn 27)
+
+A picture you upload of yourself, offered in exactly one row on Account and asked for
+nowhere else. Screens `27a`–`27j`. Turn 15 decided that nobody uploads a picture here and
+this turn overrules that decision as narrowly as it can: the initials circle stays the
+default, the fallback and the loading state, and nothing in the app ever nudges towards a
+photo. A list where nine of twelve people are initials has to read as intended.
+
+### Decisions
+
+| Question | Decision |
+|---|---|
+| Where it lives | Account data on `users`, not the synced tables. Same picture on every device, none for a guest |
+| Who may see it | Anybody. It is the one image in the app that is the same for every viewer |
+| On a locked shelf | Still shown. The picture is account data, not shelf data, and 27b says so before the upload |
+| How many | One. Replacing overwrites; there is no gallery and no history |
+| Who crops | The person, in a framing step that opens on the centre square |
+| Who renders | The server, from the original plus a crop rectangle, so every client produces the same circle |
+| Sizes stored | One 512px JPEG. The largest circle drawn is 56, and one object is one cache entry per person |
+| Treatment | None. Both kinds wear the same inset hairline: ink 8% on tint, 12% over a photo |
+| At 24px | Still a photo. Identity survives as colour when the features are gone |
+| Removing | Straight back to the initials. There is no grey silhouette in this app |
+
+### Why the clients re-encode before uploading
+
+`AvatarService` decodes JPEG and PNG only, which is narrower than the four types 27d names
+to the person. Both clients decode the chosen file themselves — they have to, to draw the
+framing step — and what they upload is the result of that, at full size.
+
+That is not thrift. A phone JPEG carries an EXIF orientation flag which every gallery
+applies and `ImageIO` ignores, so a picture framed upright would arrive on its side. Drawing
+it through a canvas (web) or letting the picker transcode it (iOS) bakes the rotation in and
+takes the EXIF block with it, including the place the photo was taken — which matters more
+here than anywhere else in the app, because this is the one picture that is public.
+
+The upload is still the whole picture, so 27d's determinate progress bar is measuring
+something real: a 12 MB photo on a phone connection.
+
+### Deliberate deviations from the deck
+
+- **One rendered size, not several.** 27b says "the server renders the sizes"; it renders
+  one 512px square. Six objects would be six cache entries for a picture that appears beside
+  itself at four sizes on a single screen, and 512 covers a 56px circle at any density.
+- **The tint hash.** `Avatar.dc.html` hashes the name with `h*31 + c`; the app has always
+  summed the char codes. Adopting the deck's would recolour every existing avatar in the app
+  for no gain, so the app's own hash stays.
+- **The Profile card still has two rows, not three.** 27a draws Picture, Display name and
+  Handle together. The handle has lived in the Sharing panel since turn 15 and moving it is
+  not this turn's business; the picture went in above the name, where the deck puts it.
+- **`StorageUnavailableException` is a 502, not 27d's 503.** It is the status the rest of the
+  app already answers with when object storage does not; the sentence the person reads is
+  27d's, and the client treats any failure that is not 413 or 415 as that state.
+- **Recent collectors on the phone remember a URL.** That list is drawn from the device and
+  asks the server nothing, so a picture replaced since the last visit shows the old one there
+  until the shelf is opened again. A picture *removed* since heals itself: the URL 404s and
+  the circle underneath is already the right drawing of that person.
+
+### Open
+
+- The picture does not appear in the transactional mails' header.
+- No report path for a stranger's picture on a public page.
+- Dark mode, where the hairline would flip to white ink.

@@ -39,7 +39,13 @@ public record AccountExportDto(
      * app has no screen for, and tying the two together would make one of them wrong later.
      */
     public record AccountDto(
-            java.util.UUID id, String email, String displayName, String handle, Instant createdAt) {}
+            java.util.UUID id,
+            String email,
+            String displayName,
+            String handle,
+            /** Where the profile picture is served from, or null if none was ever set. */
+            String avatarUrl,
+            Instant createdAt) {}
 
     /**
      * One connection. The other person is named by handle only -- the handle is the thing

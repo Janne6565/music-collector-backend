@@ -14,6 +14,7 @@ import com.rekordo.repository.CopyRepository;
 import com.rekordo.repository.PhotoRepository;
 import com.rekordo.repository.UserRepository;
 import com.rekordo.services.mail.AccountMailEvent;
+import com.rekordo.services.storage.AvatarService;
 import com.rekordo.services.storage.StorageService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -162,6 +163,12 @@ public class AuthService {
                 storageService.delete(photo.getStorageKey());
             }
         }
+        // The profile picture goes with the account. It is the one object in storage that
+        // is public, so leaving it behind would leave a face reachable by URL after the
+        // person asked for everything to be gone.
+        if (user.getAvatarKey() != null) {
+            storageService.delete(user.getAvatarKey());
+        }
         userRepository.delete(user);
         events.publishEvent(new AccountMailEvent.AccountDeleted(recipient, copies));
         log.info("Deleted account {}", user.getId());
@@ -172,6 +179,7 @@ public class AuthService {
                 user.getId(),
                 user.getEmail(),
                 user.getDisplayName(),
+                AvatarService.urlFor(user),
                 user.getCreatedAt(),
                 user.getEmailVerifiedAt() != null,
                 user.getPasswordHash() != null);

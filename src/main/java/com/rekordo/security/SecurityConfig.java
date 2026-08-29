@@ -50,6 +50,13 @@ public class SecurityConfig {
             // request inside PhotoService against the owner's sharing settings, which a
             // path rule cannot express.
             "/api/v1/photos/*/content",
+            // The profile picture, which is the one image in the app that is the same for
+            // every viewer. It is account data rather than shelf data, so it renders on a
+            // profile whose collection does not (27f) -- and the upload flow says so before
+            // anybody commits to it. Setting and removing one is POST/DELETE on
+            // /api/v1/avatar itself, which this pattern does not match and which stays
+            // behind the token.
+            "/api/v1/avatar/*",
             "/actuator/health/**",
             "/actuator/prometheus",
             "/v3/api-docs/**",

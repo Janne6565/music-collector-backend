@@ -14,6 +14,7 @@ import com.rekordo.services.auth.ConsentService;
 import com.rekordo.services.notifications.NotificationPreferenceService;
 import com.rekordo.services.social.FriendshipService;
 import com.rekordo.services.social.SharingService;
+import com.rekordo.services.storage.AvatarService;
 import com.rekordo.services.sync.SyncService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -86,6 +87,7 @@ public class AccountExportService {
                         user.getEmail(),
                         user.getDisplayName(),
                         user.getHandle(),
+                        AvatarService.urlFor(user),
                         user.getCreatedAt()),
                 consentService.list(user.getId()),
                 sharingService.read(user.getId()),

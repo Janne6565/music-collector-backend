@@ -25,6 +25,7 @@ import com.rekordo.repository.ReleaseRepository;
 import com.rekordo.repository.UserRepository;
 import com.rekordo.repository.WishlistItemRepository;
 import com.rekordo.services.metadata.MetadataMapper;
+import com.rekordo.services.storage.AvatarService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -96,6 +97,7 @@ public class ProfileService {
                 owner.getId(),
                 owner.getHandle(),
                 owner.getDisplayName(),
+                AvatarService.urlFor(owner),
                 friendshipService.relationship(viewerId, owner.getId()),
                 collection,
                 visibilityService.canSeeWishlist(viewerId, owner.getId()),
@@ -197,6 +199,7 @@ public class ProfileService {
                 user.getId(),
                 user.getHandle(),
                 user.getDisplayName(),
+                AvatarService.urlFor(user),
                 visible ? copyRepository.countVisible(user.getId()) : null,
                 friendshipService.relationship(viewerId, user.getId()),
                 !visible);
