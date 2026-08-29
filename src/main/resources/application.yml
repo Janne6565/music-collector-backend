@@ -141,11 +141,12 @@ management:
       percentiles-histogram:
         http.server.requests: true
         http.client.requests: true
-      # The client histogram is for the metadata APIs, whose slow calls are seconds rather
-      # than milliseconds. The default range would put every one of them in the top bucket.
-      maximum-expected-value:
-        http.server.requests: 10s
-        http.client.requests: 30s
+      # No expected-value bounds here. These keys match by prefix, so a bound meant for the
+      # http.server.requests timer also lands on http.server.requests.active -- a long task
+      # timer whose own minimum is two minutes -- and Micrometer rejects the pair at the
+      # first request with "maximumExpectedValue must be >= minimumExpectedValue". Every
+      # request 500s while the app itself looks perfectly healthy. The defaults span a
+      # millisecond to thirty seconds, which covers both a local call and a slow Discogs one.
 
 springdoc:
   swagger-ui:
