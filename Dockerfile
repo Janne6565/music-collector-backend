@@ -22,4 +22,11 @@ COPY --from=build /build/target/backend-*.jar app.jar
 EXPOSE 8080
 # The agent is inert with no OTEL_EXPORTER_OTLP_ENDPOINT set, so a plain `docker run` and
 # the local compose stack behave exactly as they did before.
-ENTRYPOINT ["java", "-javaagent:/app/otel-agent.jar", "-jar", "/app/app.jar"]
+#
+# -Dotel.metrics.exporter=none has to be a system property, not the OTEL_METRICS_EXPORTER
+# environment variable that would otherwise say the same thing. The agent reads both; Boot's
+# OpenTelemetry module reads only the environment variable, and takes "none" to mean its own
+# Micrometer registry as well. Setting it there turns off the exporter that carries the
+# application's metrics and leaves the agent's duplicate JVM metrics as the only ones -- the
+# exact opposite of what is wanted, and silent.
+ENTRYPOINT ["java", "-javaagent:/app/otel-agent.jar", "-Dotel.metrics.exporter=none", "-jar", "/app/app.jar"]

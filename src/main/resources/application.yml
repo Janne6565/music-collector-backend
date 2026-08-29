@@ -118,6 +118,22 @@ management:
     health:
       probes:
         enabled: true
+  # Where the app's own meters go. The tracing agent is a separate exporter with a separate
+  # endpoint -- gRPC on 4317 for spans, this HTTP one on 4318 for metrics -- and the agent's
+  # metric exporter is switched off in the Dockerfile so the two cannot both publish the JVM.
+  #
+  # Resource attributes are not set here: Micrometer's OtlpConfig reads OTEL_SERVICE_NAME and
+  # OTEL_RESOURCE_ATTRIBUTES from the environment, which is the same pair the agent reads, so
+  # one setting names this service for both signals and they cannot drift apart.
+  otlp:
+    metrics:
+      export:
+        # Off is the local default: a laptop should not write into the cluster's telemetry
+        # store. The URL must be the OTLP-*HTTP* port with its scheme and path, since this
+        # registry speaks HTTP/protobuf and not gRPC.
+        enabled: ${MC_OTLP_METRICS_ENABLED:false}
+        url: ${MC_OTLP_METRICS_URL:http://localhost:4318/v1/metrics}
+        step: 30s
   metrics:
     distribution:
       # Without this a timer ships only count and sum, and every latency question can be
