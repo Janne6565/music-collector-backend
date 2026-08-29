@@ -5,10 +5,13 @@ import com.rekordo.model.exception.StorageUnavailableException;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
 import io.minio.GetObjectResponse;
+import io.minio.ListObjectsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import io.minio.Result;
+import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +20,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
+import java.util.function.ObjLongConsumer;
 
 /**
  * Object storage for sleeve photos.
@@ -72,6 +76,34 @@ public class StorageService {
                     .build());
         } catch (Exception e) {
             throw new StorageUnavailableException("download", e);
+        }
+    }
+
+    /**
+     * Walks every object in the bucket, handing each key and its size to {@code visitor}.
+     *
+     * <p>The only way to ask what storage actually costs. The database knows what it *meant*
+     * to store, which is a different number: {@link #delete} is best effort by design, so a
+     * failed removal leaves bytes behind that no row accounts for. Nothing but a walk finds
+     * those.
+     *
+     * <p>Paged by the client at 1000 keys a request, so this is one round trip per thousand
+     * objects. Cheap today and linear in the bucket forever, which is why the only caller
+     * runs it on a slow timer rather than on a scrape.
+     */
+    public void forEachObject(ObjLongConsumer<String> visitor) {
+        try {
+            for (Result<Item> result : client.listObjects(ListObjectsArgs.builder()
+                    .bucket(properties.bucket())
+                    .recursive(true)
+                    .build())) {
+                Item item = result.get();
+                if (!item.isDir()) {
+                    visitor.accept(item.objectName(), item.size());
+                }
+            }
+        } catch (Exception e) {
+            throw new StorageUnavailableException("list", e);
         }
     }
 
