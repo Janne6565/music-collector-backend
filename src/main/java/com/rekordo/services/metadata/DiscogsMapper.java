@@ -21,6 +21,25 @@ public final class DiscogsMapper {
 
     private static final String ARTIST_TITLE_SEPARATOR = " - ";
 
+    /**
+     * Discogs' disambiguation suffix: {@code "Ben Howard (2)"} is the second Ben Howard in
+     * their database, not a Ben Howard who released two records.
+     *
+     * <p>Digits only, and anchored to the end, so it cannot eat a name that legitimately
+     * ends in brackets. {@code "Sunn O)))"} keeps its brackets; {@code "Aphex Twin (2)"}
+     * loses only the key.
+     */
+    private static final Pattern DISCOGS_DISAMBIGUATION = Pattern.compile("\\s*\\(\\d+\\)$");
+
+    /**
+     * Discogs' artist name variation marker: the credit printed on this particular release
+     * differs from the artist's canonical entry, as in {@code "\u4e45\u77f3\u8b72*"} for Joe Hisaishi.
+     *
+     * <p>Which release credited them how is a fact about Discogs' catalogue, not about the
+     * record on your shelf, and the asterisk means nothing to anyone reading a shelf.
+     */
+    private static final Pattern DISCOGS_NAME_VARIATION = Pattern.compile("\\*$");
+
     private DiscogsMapper() {}
 
     /**
@@ -35,7 +54,24 @@ public final class DiscogsMapper {
             return "Unknown artist";
         }
         int split = combined.indexOf(ARTIST_TITLE_SEPARATOR);
-        return split < 0 ? "Unknown artist" : combined.substring(0, split).trim();
+        if (split < 0) {
+            return "Unknown artist";
+        }
+        return withoutDiscogsBookkeeping(combined.substring(0, split).trim());
+    }
+
+    /**
+     * Strips the two markers Discogs keeps its catalogue tidy with and nobody else wants.
+     *
+     * <p>The variation marker comes off first: Discogs writes it outside the
+     * disambiguation key, so {@code "Berlioz (2)*"} needs the asterisk gone before the
+     * bracket is at the end to be matched. A name that is nothing but a marker is left
+     * alone rather than emptied -- a blank artist is worse than a puzzling one.
+     */
+    private static String withoutDiscogsBookkeeping(String name) {
+        String stripped = DISCOGS_NAME_VARIATION.matcher(name).replaceFirst("");
+        stripped = DISCOGS_DISAMBIGUATION.matcher(stripped).replaceFirst("").trim();
+        return stripped.isEmpty() ? name : stripped;
     }
 
     public static String titleOf(String combined) {
