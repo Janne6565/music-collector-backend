@@ -132,16 +132,21 @@ public class SyncService {
             return new Pushed<>(List.of(), 0);
         }
 
-        List<UUID> ids = incoming.stream().map(photo -> UUID.fromString(photo.id())).toList();
+        List<SyncPhotoDto> accepted = incoming.stream().filter(this::storable).toList();
+        if (accepted.isEmpty()) {
+            return new Pushed<>(List.of(), 0);
+        }
+
+        List<UUID> ids = accepted.stream().map(photo -> idOf(photo.id())).toList();
         Map<UUID, PhotoEntity> stored = new HashMap<>();
         for (PhotoEntity entity : photoRepository.findAllByUserIdAndIdIn(userId, ids)) {
             stored.put(entity.getId(), entity);
         }
 
-        List<SyncPhotoDto> results = new ArrayList<>(incoming.size());
+        List<SyncPhotoDto> results = new ArrayList<>(accepted.size());
         long highWaterMark = 0;
-        for (SyncPhotoDto client : incoming) {
-            UUID id = UUID.fromString(client.id());
+        for (SyncPhotoDto client : accepted) {
+            UUID id = idOf(client.id());
             PhotoEntity entity = stored.get(id);
             SyncPhotoDto merged = PhotoMerge.merge(entity == null ? null : toPhotoDto(entity), client);
 
@@ -185,7 +190,23 @@ public class SyncService {
     }
 
     private static UUID parseId(String value) {
-        return value == null || value.isBlank() ? null : UUID.fromString(value);
+        return value == null || value.isBlank() ? null : idOf(value);
+    }
+
+    /**
+     * A well-formed UUID, or null.
+     *
+     * <p>Lenient on purpose. Every id in a batch is parsed before anything is written, so a
+     * single unparseable one used to throw out of the whole request -- and since a client
+     * only clears its pending set on a successful push, it would send that same batch again
+     * every minute for ever. One bad record must cost that record, not the device.
+     */
+    private static UUID idOf(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return null;
+        }
     }
 
     private SyncPhotoDto toPhotoDto(PhotoEntity entity) {
@@ -203,6 +224,51 @@ public class SyncService {
     }
 
     /**
+     * Whether a pushed record can be stored at all.
+     *
+     * <p>Push is one transaction, so a row that cannot be written does not fail alone: it
+     * takes the whole batch with it. And a client only clears its pending set once the push
+     * has succeeded, so the same doomed batch comes back every sync -- every record written
+     * on that device afterwards queued behind a row that will never land. One photo deleted
+     * a second after it was taken is enough to freeze a phone's push for days.
+     *
+     * <p>So a record the schema cannot hold is dropped here, before anything is written, and
+     * said out loud. Dropping it is not free -- the client hears no objection and clears it
+     * from pending -- but it is the cheaper of the two losses: the alternative costs every
+     * *other* record on that device as well, indefinitely.
+     */
+    private boolean storable(String kind, String id, Long createdAt) {
+        if (idOf(id) == null) {
+            log.warn("Dropping {} from push: id {} is not a UUID", kind, id);
+            return false;
+        }
+        if (createdAt == null) {
+            log.warn("Dropping {} {} from push: no createdAt", kind, id);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * As {@link #storable(String, String, Long)}, plus the one rule specific to photos.
+     *
+     * <p>A live photo with no storage key names bytes that are nowhere: no other device can
+     * ever fetch it, and the clients do not send one. A *deleted* photo with no key is
+     * ordinary and must be kept -- that is a picture deleted before its upload finished, and
+     * the tombstone is the only thing that carries the delete to the other devices.
+     */
+    private boolean storable(SyncPhotoDto photo) {
+        if (!storable("photo", photo.id(), photo.createdAt())) {
+            return false;
+        }
+        if (photo.storageKey() == null && photo.deletedAt() == null) {
+            log.warn("Dropping photo {} from push: live but has no storage key", photo.id());
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * The merged records plus the highest sequence written.
      *
      * Returned rather than kept in a field: this service is a singleton, so per-request
@@ -215,17 +281,23 @@ public class SyncService {
             return new Pushed<>(List.of(), 0);
         }
 
-        List<UUID> ids = incoming.stream().map(copy -> UUID.fromString(copy.id())).toList();
+        List<SyncCopyDto> accepted =
+                incoming.stream().filter(copy -> storable("copy", copy.id(), copy.createdAt())).toList();
+        if (accepted.isEmpty()) {
+            return new Pushed<>(List.of(), 0);
+        }
+
+        List<UUID> ids = accepted.stream().map(copy -> idOf(copy.id())).toList();
         Map<UUID, CopyEntity> stored = new HashMap<>();
         for (CopyEntity entity : copyRepository.findAllByUserIdAndIdIn(userId, ids)) {
             stored.put(entity.getId(), entity);
         }
 
-        List<SyncCopyDto> results = new ArrayList<>(incoming.size());
+        List<SyncCopyDto> results = new ArrayList<>(accepted.size());
         long highWaterMark = 0;
 
-        for (SyncCopyDto client : incoming) {
-            UUID id = UUID.fromString(client.id());
+        for (SyncCopyDto client : accepted) {
+            UUID id = idOf(client.id());
             CopyEntity entity = stored.get(id);
             boolean created = entity == null;
             SyncCopyDto merged = CopyMerge.merge(entity == null ? null : toDto(entity), client);
@@ -292,16 +364,22 @@ public class SyncService {
             return new Pushed<>(List.of(), 0);
         }
 
-        List<UUID> ids = incoming.stream().map(wish -> UUID.fromString(wish.id())).toList();
+        List<SyncWishDto> accepted =
+                incoming.stream().filter(wish -> storable("wish", wish.id(), wish.createdAt())).toList();
+        if (accepted.isEmpty()) {
+            return new Pushed<>(List.of(), 0);
+        }
+
+        List<UUID> ids = accepted.stream().map(wish -> idOf(wish.id())).toList();
         Map<UUID, WishlistItemEntity> stored = new HashMap<>();
         for (WishlistItemEntity entity : wishlistItemRepository.findAllByUserIdAndIdIn(userId, ids)) {
             stored.put(entity.getId(), entity);
         }
 
-        List<SyncWishDto> results = new ArrayList<>(incoming.size());
+        List<SyncWishDto> results = new ArrayList<>(accepted.size());
         long highWaterMark = 0;
-        for (SyncWishDto client : incoming) {
-            UUID id = UUID.fromString(client.id());
+        for (SyncWishDto client : accepted) {
+            UUID id = idOf(client.id());
             WishlistItemEntity entity = stored.get(id);
             boolean created = entity == null;
             SyncWishDto merged = WishMerge.merge(entity == null ? null : toWishDto(entity), client);

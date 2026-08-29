@@ -32,7 +32,14 @@ public class PhotoEntity {
     @Column(name = "wish_id")
     private UUID wishId;
 
-    @Column(name = "storage_key", nullable = false)
+    /**
+     * Where the bytes are in object storage, or null when there are none.
+     *
+     * <p>Null only for a tombstone: a photo deleted before its upload finished never gets
+     * a key, because the clients stop retrying an upload once the row is deleted. The
+     * tombstone still has to travel, or the delete would not reach the other devices.
+     */
+    @Column(name = "storage_key")
     private String storageKey;
 
     @Column(name = "content_type", nullable = false)

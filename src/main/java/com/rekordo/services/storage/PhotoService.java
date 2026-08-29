@@ -119,7 +119,9 @@ public class PhotoService {
     public Download download(UUID viewerId, UUID photoId) {
         PhotoEntity entity = photoRepository
                 .findById(photoId)
-                .filter(photo -> photo.getDeletedAt() == null)
+                // A row with no storage key names no bytes -- there is nothing to serve, and
+                // asking storage for a null key would be a 500 rather than the 404 this is.
+                .filter(photo -> photo.getDeletedAt() == null && photo.getStorageKey() != null)
                 .orElseThrow(() -> new PhotoNotFoundException(photoId));
         if (!maySee(viewerId, entity)) {
             log.warn("Photo {} refused to viewer {}", photoId, viewerId);

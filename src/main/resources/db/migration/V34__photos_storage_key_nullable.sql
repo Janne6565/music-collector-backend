@@ -1,0 +1,15 @@
+-- A photo deleted before its bytes finished uploading has no storage key, and never will.
+--
+-- `listPhotosAwaitingUpload` on the clients skips tombstoned rows, so once a picture is
+-- deleted its upload is never retried: the key stays null for good. The client still
+-- pushes the tombstone -- it has to, or the delete would not replicate -- and this column
+-- being NOT NULL turned that into a constraint violation. Since push is one transaction,
+-- a single such row rolled back the whole batch, and because the client only clears its
+-- pending set on a successful push, the same doomed batch was retried every sync. One
+-- photo deleted a second after it was taken permanently froze a device's push: 42 failed
+-- pushes in six hours, with every record written since stuck behind it.
+--
+-- Nullable is also simply the honest schema. `storage_key` names bytes in object storage;
+-- a tombstone names no bytes, and the row exists only to carry the delete to the other
+-- devices.
+ALTER TABLE photos ALTER COLUMN storage_key DROP NOT NULL;
