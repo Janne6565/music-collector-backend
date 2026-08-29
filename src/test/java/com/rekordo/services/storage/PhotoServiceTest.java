@@ -246,6 +246,33 @@ class PhotoServiceTest {
         return photo;
     }
 
+    @Test
+    void refusesAnUploadAgainstAPhotoThatBelongsToSomebodyElse() {
+        // The id is the client's, and a photo id is readable off any shelf the caller can
+        // see. Without this, uploading against one rewrites that row's owner and key: the
+        // picture leaves its owner's collection and lands in the caller's.
+        when(photoRepository.findById(PHOTO)).thenReturn(Optional.of(photoOf(STRANGER)));
+
+        assertThatThrownBy(() -> service.upload(USER, PHOTO, COPY, null, file("image/jpeg", 100)))
+                .isInstanceOf(PhotoNotFoundException.class);
+
+        // Nothing written, and nothing said about whether the id was real.
+        verifyNoInteractions(storageService);
+        verify(photoRepository, never()).save(any());
+    }
+
+    @Test
+    void servesAContentTypeTheAllowlistHolds() {
+        // The bytes come back from the same origin as the web app, so a stored "text/html"
+        // would be script running as the app itself. The stored value is not trusted at the
+        // point it is put in a header.
+        PhotoEntity photo = photoOf(USER);
+        photo.setContentType("text/html");
+        when(photoRepository.findById(PHOTO)).thenReturn(Optional.of(photo));
+
+        assertThat(service.download(USER, PHOTO).contentType()).isEqualTo("application/octet-stream");
+    }
+
     private static PhotoEntity photoOf(UUID owner) {
         PhotoEntity photo = new PhotoEntity();
         photo.setId(PHOTO);

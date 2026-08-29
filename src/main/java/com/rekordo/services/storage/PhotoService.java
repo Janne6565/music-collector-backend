@@ -31,9 +31,39 @@ public class PhotoService {
     /**
      * What a phone camera or a file picker actually produces. Deliberately a allowlist:
      * accepting whatever arrives would let this endpoint store anything at all.
+     *
+     * <p>Shared with {@code SyncService}, which has to apply the same list to a content type
+     * that arrived through a push rather than an upload. One list, or the endpoint that
+     * serves the bytes ends up more permissive than the one that took them.
      */
-    private static final Set<String> ALLOWED_TYPES =
+    public static final Set<String> ALLOWED_TYPES =
             Set.of("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif");
+
+    /** What a content type outside the allowlist is served and stored as. */
+    public static final String FALLBACK_TYPE = "application/octet-stream";
+
+    /**
+     * Where one account's photo lives in the bucket.
+     *
+     * <p>Derived from the two ids rather than accepted from anybody. The key is what decides
+     * whose bytes come back, so a client that could choose it could choose to be served, or
+     * to delete, somebody else's picture.
+     */
+    public static String objectKey(UUID userId, UUID photoId) {
+        return "%s/%s".formatted(userId, photoId);
+    }
+
+    /**
+     * The content type this photo may be served as.
+     *
+     * <p>Anything off the allowlist becomes {@value #FALLBACK_TYPE}. The bytes are served
+     * from the same origin as the web app, so a stored {@code text/html} would be a script
+     * running as the app itself -- and the response header is the whole of what decides
+     * that, since a declared type is not something {@code nosniff} can save anybody from.
+     */
+    public static String servableType(String stored) {
+        return stored != null && ALLOWED_TYPES.contains(stored.toLowerCase()) ? stored.toLowerCase() : FALLBACK_TYPE;
+    }
 
     private final PhotoRepository photoRepository;
     private final CopyRepository copyRepository;
@@ -55,10 +85,13 @@ public class PhotoService {
         if ((copyId == null) == (wishId == null)) {
             throw new PhotoOwnerRequiredException();
         }
-        String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_TYPES.contains(contentType.toLowerCase())) {
-            throw new UnsupportedPhotoTypeException(String.valueOf(contentType));
+        String declared = file.getContentType();
+        if (declared == null || !ALLOWED_TYPES.contains(declared.toLowerCase())) {
+            throw new UnsupportedPhotoTypeException(String.valueOf(declared));
         }
+        // Stored lowercased, so what is written is always exactly what the allowlist holds
+        // and the serving side has nothing left to normalise.
+        String contentType = declared.toLowerCase();
         if (file.getSize() > properties.maxPhotoBytes()) {
             throw new PhotoTooLargeException(properties.maxPhotoBytes());
         }
@@ -67,6 +100,15 @@ public class PhotoService {
         // id may already have: re-uploading a photo overwrites its object rather than adding
         // one, so what it costs is the difference, not the whole file.
         PhotoEntity existing = photoRepository.findById(photoId).orElse(null);
+        // The id comes from the client, so it can name a row that is somebody else's. Without
+        // this, uploading against an id read off a public shelf would rewrite that row's
+        // owner and key -- taking the picture out of its collection and into the caller's.
+        // The same 404 as a photo that does not exist, so this cannot be used to ask which
+        // ids are real.
+        if (existing != null && existing.getUserId() != null && !existing.getUserId().equals(userId)) {
+            log.warn("Upload for photo {} refused: it belongs to another account", photoId);
+            throw new PhotoNotFoundException(photoId);
+        }
         long replacing = existing == null || existing.getStorageKey() == null || existing.getByteSize() == null
                 ? 0L
                 : existing.getByteSize();
@@ -74,7 +116,7 @@ public class PhotoService {
 
         // Namespaced by user so one account's objects are never confusable with another's,
         // even if an id were somehow reused.
-        String key = "%s/%s".formatted(userId, photoId);
+        String key = objectKey(userId, photoId);
         try {
             storageService.put(key, file.getInputStream(), file.getSize(), contentType);
         } catch (IOException e) {
@@ -137,7 +179,10 @@ public class PhotoService {
             log.warn("Photo {} refused to viewer {}", photoId, viewerId);
             throw new PhotoNotFoundException(photoId);
         }
-        return new Download(storageService.get(entity.getStorageKey()), entity.getContentType(), entity.getByteSize());
+        return new Download(
+                storageService.get(entity.getStorageKey()),
+                servableType(entity.getContentType()),
+                entity.getByteSize());
     }
 
     private boolean maySee(UUID viewerId, PhotoEntity photo) {

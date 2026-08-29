@@ -5,6 +5,7 @@ import com.rekordo.entity.OAuthStateEntity;
 import com.rekordo.model.core.OAuthClient;
 import com.rekordo.model.exception.OAuthFailedException;
 import com.rekordo.repository.OAuthStateRepository;
+import com.rekordo.services.auth.OneTimeToken;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -17,10 +18,15 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OAuthServiceTest {
+
+    /** The secret the browser that started a flow is holding, in the tests that have one. */
+    private static final String BINDING = "the-browser-that-started-it";
 
     @Mock private OAuthStateRepository stateRepository;
 
@@ -53,14 +59,14 @@ class OAuthServiceTest {
     void asksAppleToPostTheCallbackBack() {
         // Apple rejects the request outright if name or e-mail scope is asked for without
         // this, so its absence would break every Apple sign-in on the first attempt.
-        String url = service(Map.of("apple", applePostsBack())).authorizeUrl("apple", OAuthClient.WEB);
+        String url = service(Map.of("apple", applePostsBack())).authorizeUrl("apple", OAuthClient.WEB).url();
 
         assertThat(url).contains("response_mode=form_post");
     }
 
     @Test
     void leavesResponseModeOffForProvidersThatRedirectNormally() {
-        String url = service(Map.of("google", configured())).authorizeUrl("google", OAuthClient.WEB);
+        String url = service(Map.of("google", configured())).authorizeUrl("google", OAuthClient.WEB).url();
 
         assertThat(url).doesNotContain("response_mode");
     }
@@ -94,7 +100,7 @@ class OAuthServiceTest {
     void buildsAnAuthorizeUrlCarryingAFreshState() {
         when(stateRepository.save(any())).thenAnswer(call -> call.getArgument(0));
 
-        String url = service(Map.of("google", configured())).authorizeUrl("google", OAuthClient.WEB);
+        String url = service(Map.of("google", configured())).authorizeUrl("google", OAuthClient.WEB).url();
 
         assertThat(url).startsWith("https://accounts.example/authorize");
         assertThat(url).contains("client_id=client-id");
@@ -109,7 +115,7 @@ class OAuthServiceTest {
         // URI.create throw on the very first sign-in with any real provider.
         when(stateRepository.save(any())).thenAnswer(call -> call.getArgument(0));
 
-        String url = service(Map.of("google", configured())).authorizeUrl("google", OAuthClient.WEB);
+        String url = service(Map.of("google", configured())).authorizeUrl("google", OAuthClient.WEB).url();
 
         assertThat(url).doesNotContain(" ");
         assertThat(url).contains("scope=openid%20email");
@@ -122,6 +128,70 @@ class OAuthServiceTest {
                 .isEqualTo("https://music.example/api/v1/auth/oauth/google/callback");
     }
 
+    @Test
+    void aCallbackFromABrowserThatDidNotStartTheFlowIsRefused() {
+        // Login CSRF: an attacker begins a sign-in, holds the callback URL and gets somebody
+        // else to load it. Without this the victim's browser is signed into the attacker's
+        // account, and every record it adds from then on goes there.
+        when(stateRepository.findById("s"))
+                .thenReturn(Optional.of(state("google", Instant.now().plusSeconds(60), null)));
+
+        assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", "s", "someone-else"))
+                .isInstanceOf(OAuthFailedException.class);
+    }
+
+    @Test
+    void aCallbackPresentingNoBindingAtAllIsRefused() {
+        // A browser that never went through the authorize step has no cookie to send. That
+        // is the ordinary shape of the attack, not an edge case.
+        when(stateRepository.findById("s"))
+                .thenReturn(Optional.of(state("google", Instant.now().plusSeconds(60), null)));
+
+        assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", "s", null))
+                .isInstanceOf(OAuthFailedException.class);
+    }
+
+    @Test
+    void aStateWrittenBeforeBindingsExistedIsRefused() {
+        // Rows in flight across the deploy. Refusing costs one retry inside the state's
+        // ten-minute life; accepting would leave the hole open for exactly as long as an
+        // attacker was willing to pre-warm a state before it.
+        OAuthStateEntity unbound = state("google", Instant.now().plusSeconds(60), null);
+        unbound.setBindingHash(null);
+        when(stateRepository.findById("s")).thenReturn(Optional.of(unbound));
+
+        assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", "s", BINDING))
+                .isInstanceOf(OAuthFailedException.class);
+    }
+
+    @Test
+    void aRefusedBindingBurnsTheStateAnyway() {
+        // It is now known to somebody it was not issued to. Leaving it live would let them
+        // keep trying it against one browser after another.
+        when(stateRepository.findById("s"))
+                .thenReturn(Optional.of(state("google", Instant.now().plusSeconds(60), null)));
+
+        assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", "s", "someone-else"))
+                .isInstanceOf(OAuthFailedException.class);
+
+        verify(stateRepository).save(argThat(saved -> saved.getUsedAt() != null));
+    }
+
+    @Test
+    void theAuthorizeStepHandsBackASecretForTheBrowserToKeep() {
+        when(stateRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        OAuthService.Authorization authorization =
+                service(Map.of("google", configured())).authorizeUrl("google", OAuthClient.WEB);
+
+        // Never the state itself, and never in the URL: the point is that it travels by a
+        // route the provider's redirect does not.
+        assertThat(authorization.binding()).isNotBlank();
+        assertThat(authorization.url()).doesNotContain(authorization.binding());
+        verify(stateRepository)
+                .save(argThat(saved -> OneTimeToken.hash(authorization.binding()).equals(saved.getBindingHash())));
+    }
+
     private OAuthStateEntity state(String provider, Instant expiresAt, Instant usedAt) {
         return state(provider, expiresAt, usedAt, OAuthClient.WEB);
     }
@@ -131,6 +201,7 @@ class OAuthServiceTest {
         entity.setState("s");
         entity.setProvider(provider);
         entity.setClient(client);
+        entity.setBindingHash(OneTimeToken.hash(BINDING));
         entity.setExpiresAt(expiresAt);
         entity.setUsedAt(usedAt);
         entity.setCreatedAt(Instant.now());
@@ -143,7 +214,7 @@ class OAuthServiceTest {
         when(stateRepository.findById("s"))
                 .thenReturn(Optional.of(state("google", Instant.now().plusSeconds(60), Instant.now())));
 
-        assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", "s"))
+        assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", "s", BINDING))
                 .isInstanceOf(OAuthFailedException.class);
     }
 
@@ -152,7 +223,7 @@ class OAuthServiceTest {
         when(stateRepository.findById("s"))
                 .thenReturn(Optional.of(state("google", Instant.now().minusSeconds(1), null)));
 
-        assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", "s"))
+        assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", "s", BINDING))
                 .isInstanceOf(OAuthFailedException.class);
     }
 
@@ -163,7 +234,7 @@ class OAuthServiceTest {
         when(stateRepository.findById("s"))
                 .thenReturn(Optional.of(state("apple", Instant.now().plusSeconds(60), null)));
 
-        assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", "s"))
+        assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", "s", BINDING))
                 .isInstanceOf(OAuthFailedException.class);
     }
 
@@ -171,7 +242,7 @@ class OAuthServiceTest {
     void aMissingStateIsRefused() {
         when(stateRepository.findById("")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", null))
+        assertThatThrownBy(() -> service(Map.of("google", configured())).consumeState("google", null, BINDING))
                 .isInstanceOf(OAuthFailedException.class);
     }
 
@@ -182,7 +253,7 @@ class OAuthServiceTest {
 
         // The callback arrives from the provider and carries nothing about who asked, so
         // the only place this can come from is the row written at the authorize step.
-        assertThat(service(Map.of("google", configured())).consumeState("google", "s"))
+        assertThat(service(Map.of("google", configured())).consumeState("google", "s", BINDING))
                 .isEqualTo(OAuthClient.MOBILE);
     }
 
@@ -191,7 +262,7 @@ class OAuthServiceTest {
         when(stateRepository.findById("s"))
                 .thenReturn(Optional.of(state("google", Instant.now().plusSeconds(60), null, null)));
 
-        assertThat(service(Map.of("google", configured())).consumeState("google", "s"))
+        assertThat(service(Map.of("google", configured())).consumeState("google", "s", BINDING))
                 .isEqualTo(OAuthClient.WEB);
     }
 

@@ -6,6 +6,7 @@ import com.rekordo.model.core.AuthProviderDto;
 import com.rekordo.model.core.OAuthClient;
 import com.rekordo.model.exception.OAuthFailedException;
 import com.rekordo.repository.OAuthStateRepository;
+import com.rekordo.services.auth.OneTimeToken;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -32,7 +35,8 @@ import java.util.Map;
 public class OAuthService {
 
     private static final Logger log = LoggerFactory.getLogger(OAuthService.class);
-    private static final Duration STATE_LIFETIME = Duration.ofMinutes(10);
+    /** Public because the cookie that binds a flow to a browser must not outlive its state. */
+    public static final Duration STATE_LIFETIME = Duration.ofMinutes(10);
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final OAuthProperties properties;
@@ -57,17 +61,28 @@ public class OAuthService {
         return provider;
     }
 
+    /**
+     * Where to send the person, and the secret their browser has to keep.
+     *
+     * <p>Two values rather than one because the state alone proves nothing about who is
+     * finishing the flow. The caller puts the binding in a cookie; only the browser that
+     * started this can then complete it.
+     */
     @Transactional
-    public String authorizeUrl(String providerId, OAuthClient client) {
+    public Authorization authorizeUrl(String providerId, OAuthClient client) {
         OAuthProperties.Provider provider = require(providerId);
 
         byte[] raw = new byte[32];
         RANDOM.nextBytes(raw);
         String state = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
+        String binding = OneTimeToken.issue();
 
         OAuthStateEntity entity = new OAuthStateEntity();
         entity.setState(state);
         entity.setProvider(providerId);
+        // Only the hash, as everywhere else here: a row sitting in a leaked database must
+        // not be half of a sign-in waiting to be finished.
+        entity.setBindingHash(OneTimeToken.hash(binding));
         // Remembered here because the callback comes from the provider and says nothing
         // about who started the flow, yet the two clients have to be finished differently.
         entity.setClient(client);
@@ -88,28 +103,52 @@ public class OAuthService {
             url = url.queryParam("response_mode", provider.responseMode());
         }
 
-        return url.build()
-                // Encoded, or the space in a multi-scope value ("openid email profile")
-                // makes an invalid URI and the redirect throws before it is ever sent.
-                .encode()
-                .toUriString();
+        return new Authorization(
+                url.build()
+                        // Encoded, or the space in a multi-scope value ("openid email profile")
+                        // makes an invalid URI and the redirect throws before it is ever sent.
+                        .encode()
+                        .toUriString(),
+                binding);
     }
 
     /**
      * Consumes the state exactly once and reports which client began the flow; a replayed
      * callback finds it already used.
+     *
+     * @param binding the secret from the caller's cookie. It has to match the flow this state
+     *     names, or a callback URL an attacker holds could be loaded in somebody else's
+     *     browser and would sign that browser into the attacker's account. A row with no
+     *     binding at all predates the column and is refused for the same reason.
      */
     @Transactional
-    public OAuthClient consumeState(String providerId, String state) {
+    public OAuthClient consumeState(String providerId, String state, String binding) {
         OAuthStateEntity entity = stateRepository
                 .findById(state == null ? "" : state)
                 .filter(candidate -> candidate.getUsedAt() == null)
                 .filter(candidate -> candidate.getExpiresAt().isAfter(Instant.now()))
                 .filter(candidate -> candidate.getProvider().equals(providerId))
                 .orElseThrow(() -> new OAuthFailedException("That sign-in attempt is no longer valid."));
+        if (!bound(entity, binding)) {
+            // Consumed anyway. The state is now known to somebody it was not issued to, and
+            // leaving it live would let them keep trying it on other browsers.
+            entity.setUsedAt(Instant.now());
+            stateRepository.save(entity);
+            log.warn("Callback for {} presented a state its browser does not hold", providerId);
+            throw new OAuthFailedException("That sign-in attempt is no longer valid.");
+        }
         entity.setUsedAt(Instant.now());
         stateRepository.save(entity);
         return entity.getClient() == null ? OAuthClient.WEB : entity.getClient();
+    }
+
+    private static boolean bound(OAuthStateEntity entity, String binding) {
+        if (entity.getBindingHash() == null || binding == null || binding.isBlank()) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                entity.getBindingHash().getBytes(StandardCharsets.UTF_8),
+                OneTimeToken.hash(binding).getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -185,6 +224,7 @@ public class OAuthService {
         return new ExternalIdentity(
                 String.valueOf(info.get("sub")),
                 info.get("email") == null ? null : String.valueOf(info.get("email")),
+                Boolean.parseBoolean(String.valueOf(info.get("email_verified"))),
                 info.get("name") == null ? null : String.valueOf(info.get("name")));
     }
 
@@ -199,7 +239,10 @@ public class OAuthService {
             return identity;
         }
         String name = AppleUserPayload.displayName(appleUserJson);
-        return name == null ? identity : new ExternalIdentity(identity.subject(), identity.email(), name);
+        return name == null
+                ? identity
+                : new ExternalIdentity(
+                        identity.subject(), identity.email(), identity.emailVerified(), name);
     }
 
     public String redirectUri(String providerId) {
@@ -212,6 +255,17 @@ public class OAuthService {
         return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
     }
 
-    /** @param subject the provider's stable id — the only field safe to key an account on */
-    public record ExternalIdentity(String subject, String email, String displayName) {}
+    /**
+     * @param url where to send the person
+     * @param binding the secret their browser has to present again at the callback
+     */
+    public record Authorization(String url, String binding) {}
+
+    /**
+     * @param subject the provider's stable id — the only field safe to key an account on
+     * @param emailVerified whether the provider says it has proved the address. An address it
+     *     has not proved must never reach an account that already holds it: the provider is
+     *     then only repeating something the person typed, and the person may be anybody.
+     */
+    public record ExternalIdentity(String subject, String email, boolean emailVerified, String displayName) {}
 }

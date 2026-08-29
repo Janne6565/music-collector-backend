@@ -25,6 +25,21 @@ final class IdTokenClaims {
 
     private IdTokenClaims() {}
 
+    /**
+     * Whether the provider says it has proved the address.
+     *
+     * <p>Apple sends the claim as the string {@code "true"} rather than a boolean, so both
+     * shapes are read. Absent counts as unverified: a provider that will not say has not
+     * said yes, and the only thing this answer is used for is whether an address may reach
+     * an account that already exists.
+     */
+    private static boolean verified(JsonNode claim) {
+        if (claim == null) {
+            return false;
+        }
+        return claim.isBoolean() ? claim.asBoolean() : "true".equalsIgnoreCase(claim.asString());
+    }
+
     static ExternalIdentity read(String idToken) {
         String[] parts = idToken.split("\\.");
         if (parts.length < 2) {
@@ -42,6 +57,7 @@ final class IdTokenClaims {
             return new ExternalIdentity(
                     subject.asString(),
                     email == null ? null : email.asString(),
+                    verified(claims.get("email_verified")),
                     name == null ? null : name.asString());
         } catch (RuntimeException e) {
             log.warn("Could not read the provider's id token", e);

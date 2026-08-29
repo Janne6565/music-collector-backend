@@ -11,6 +11,7 @@ import com.rekordo.services.auth.AuthService;
 import com.rekordo.services.auth.RefreshCookieFactory;
 import com.rekordo.services.auth.oauth.OAuthHandoffService;
 import com.rekordo.services.auth.oauth.OAuthService;
+import com.rekordo.services.auth.oauth.OAuthStateCookieFactory;
 import com.rekordo.services.auth.oauth.OAuthUserResolver;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -34,6 +35,7 @@ public class OAuthController implements OAuthApi {
     private final AuthService authService;
     private final OAuthHandoffService handoffService;
     private final RefreshCookieFactory refreshCookieFactory;
+    private final OAuthStateCookieFactory stateCookieFactory;
     private final OAuthProperties properties;
 
     @Override
@@ -43,20 +45,30 @@ public class OAuthController implements OAuthApi {
 
     @Override
     public ResponseEntity<Void> authorize(String provider, String client) {
+        OAuthService.Authorization authorization =
+                oauthService.authorizeUrl(provider, OAuthClient.fromParam(client));
+        // The redirect carries the cookie that says this browser is the one signing in. It
+        // has to be set here rather than at the callback, because by then the only thing
+        // proving anything is whether it came back.
         return ResponseEntity.status(302)
-                .location(URI.create(oauthService.authorizeUrl(provider, OAuthClient.fromParam(client))))
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        stateCookieFactory
+                                .create(authorization.binding(), OAuthService.STATE_LIFETIME)
+                                .toString())
+                .location(URI.create(authorization.url()))
                 .build();
     }
 
     @Override
-    public ResponseEntity<Void> callback(String provider, String code, String state, String error) {
-        return complete(provider, code, state, error, null);
+    public ResponseEntity<Void> callback(String provider, String code, String state, String error, String binding) {
+        return complete(provider, code, state, error, null, binding);
     }
 
     @Override
     public ResponseEntity<Void> callbackPosted(
-            String provider, String code, String state, String error, String user) {
-        return complete(provider, code, state, error, user);
+            String provider, String code, String state, String error, String user, String binding) {
+        return complete(provider, code, state, error, user, binding);
     }
 
     @Override
@@ -69,14 +81,14 @@ public class OAuthController implements OAuthApi {
     }
 
     private ResponseEntity<Void> complete(
-            String provider, String code, String state, String error, String appleUserJson) {
+            String provider, String code, String state, String error, String appleUserJson, String binding) {
         if (error != null || code == null) {
             // Read rather than consumed: there is nothing to complete, and burning the state
             // would only stop the person retrying from the screen they are about to see.
             return failed(oauthService.clientFor(state));
         }
         try {
-            OAuthClient client = oauthService.consumeState(provider, state);
+            OAuthClient client = oauthService.consumeState(provider, state, binding);
             UserEntity user = userResolver.resolve(
                     provider, oauthService.named(oauthService.exchange(provider, code), appleUserJson));
 
@@ -85,6 +97,7 @@ public class OAuthController implements OAuthApi {
                 // instead and trades it for the session itself. A refresh token in this URL
                 // would be a durable credential passing through the OS.
                 return ResponseEntity.status(302)
+                        .header(HttpHeaders.SET_COOKIE, stateCookieFactory.clear().toString())
                         .location(URI.create(UriComponentsBuilder.fromUriString(oauthService.mobileRedirectUri())
                                 .queryParam("code", handoffService.issue(user))
                                 .encode()
@@ -99,6 +112,7 @@ public class OAuthController implements OAuthApi {
                     .header(
                             HttpHeaders.SET_COOKIE,
                             refreshCookieFactory.create(session.refreshToken(), true).toString())
+                    .header(HttpHeaders.SET_COOKIE, stateCookieFactory.clear().toString())
                     .location(URI.create(appUrl("/?signedIn=1")))
                     .build();
         } catch (RuntimeException e) {
@@ -117,7 +131,10 @@ public class OAuthController implements OAuthApi {
                         .encode()
                         .toUriString()
                 : appUrl("/signin?oauthError=true");
-        return ResponseEntity.status(302).location(URI.create(target)).build();
+        return ResponseEntity.status(302)
+                .header(HttpHeaders.SET_COOKIE, stateCookieFactory.clear().toString())
+                .location(URI.create(target))
+                .build();
     }
 
     private String appUrl(String path) {

@@ -14,6 +14,7 @@ import com.rekordo.model.core.CopyOrigin;
 import com.rekordo.repository.WishlistItemRepository;
 import com.rekordo.services.metadata.MetadataService;
 import com.rekordo.services.social.ActivityService;
+import com.rekordo.services.storage.PhotoService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
@@ -151,7 +152,8 @@ public class SyncService {
         for (SyncPhotoDto client : accepted) {
             UUID id = idOf(client.id());
             PhotoEntity entity = stored.get(id);
-            SyncPhotoDto merged = PhotoMerge.merge(entity == null ? null : toPhotoDto(entity), client);
+            SyncPhotoDto merged =
+                    ownBytes(userId, id, entity, PhotoMerge.merge(entity == null ? null : toPhotoDto(entity), client));
 
             PhotoEntity target = entity;
             if (target == null) {
@@ -177,6 +179,55 @@ public class SyncService {
         return new Pushed<>(results, highWaterMark);
     }
 
+    /**
+     * Takes back the three fields that name bytes.
+     *
+     * <p>{@code storageKey}, {@code contentType} and {@code byteSize} travel through the
+     * merge like everything else, because a device has to be able to tell the others that an
+     * upload finished. But they are not the client's to assert: the key decides *whose*
+     * object is served and deleted, and the type decides what a browser does with it. A push
+     * naming {@code <someone-else>/<their-photo>} would otherwise be served that picture on
+     * demand -- the row is the caller's, so {@link com.rekordo.services.storage.PhotoService}
+     * asks nothing further -- and a tombstone naming it would delete it.
+     *
+     * <p>So the server answers for all three. A row it already holds keeps what the upload
+     * endpoint wrote; a row it is meeting for the first time gets the key those two ids
+     * derive, and a type off the allowlist rather than whatever the push said. The client is
+     * not told off for it: a push that fails costs the whole batch and comes back for ever
+     * (see {@link #storable(String, String, Long)}), and correcting three fields is cheaper
+     * than that for the honest client that got them wrong.
+     *
+     * <p>A null key stays null. That is a picture deleted before its upload finished, and the
+     * tombstone is the only thing carrying the delete to the other devices.
+     */
+    private SyncPhotoDto ownBytes(UUID userId, UUID id, PhotoEntity stored, SyncPhotoDto merged) {
+        boolean known = stored != null && stored.getStorageKey() != null;
+        String storageKey = known
+                ? stored.getStorageKey()
+                : merged.storageKey() == null ? null : PhotoService.objectKey(userId, id);
+        String contentType = known ? stored.getContentType() : PhotoService.servableType(merged.contentType());
+        Long byteSize = known ? stored.getByteSize() : merged.byteSize();
+
+        if (merged.storageKey() != null && !merged.storageKey().equals(storageKey)) {
+            // Worth saying out loud: no client this project ships can produce one, so a
+            // mismatch is either a build nobody remembers or somebody reaching for another
+            // account's bytes.
+            log.warn("Push for photo {} named storage key {} and did not get it", id, merged.storageKey());
+        }
+
+        return new SyncPhotoDto(
+                merged.id(),
+                merged.copyId(),
+                merged.wishId(),
+                storageKey,
+                contentType,
+                byteSize,
+                merged.sortIndex(),
+                merged.createdAt(),
+                merged.deletedAt(),
+                merged.fieldClocks());
+    }
+
     private void applyPhoto(PhotoEntity entity, SyncPhotoDto dto) {
         // Either owner may be absent: a photo pictures a copy or a wishlist entry, never
         // both. Parsed leniently rather than assumed, because an owner-less row from a
@@ -184,7 +235,7 @@ public class SyncService {
         entity.setCopyId(parseId(dto.copyId()));
         entity.setWishId(parseId(dto.wishId()));
         entity.setStorageKey(dto.storageKey());
-        entity.setContentType(dto.contentType() == null ? "application/octet-stream" : dto.contentType());
+        entity.setContentType(dto.contentType() == null ? PhotoService.FALLBACK_TYPE : dto.contentType());
         entity.setByteSize(dto.byteSize() == null ? 0L : dto.byteSize());
         entity.setSortIndex(dto.sortIndex() == null ? 0 : dto.sortIndex());
         entity.setCreatedAt(dto.createdAt());
@@ -469,6 +520,7 @@ public class SyncService {
     private void applyWish(WishlistItemEntity entity, SyncWishDto dto) {
         entity.setAlbumId(dto.albumId());
         entity.setReleaseId(dto.releaseId());
+        entity.setPendingBarcode(dto.pendingBarcode());
         entity.setTitle(dto.title() == null ? "Untitled" : dto.title());
         entity.setArtistName(dto.artistName() == null ? "Unknown artist" : dto.artistName());
         entity.setYear(dto.year());
@@ -485,6 +537,7 @@ public class SyncService {
                 entity.getId().toString(),
                 entity.getAlbumId(),
                 entity.getReleaseId(),
+                entity.getPendingBarcode(),
                 entity.getTitle(),
                 entity.getArtistName(),
                 entity.getYear(),
@@ -505,6 +558,7 @@ public class SyncService {
 
     private void apply(CopyEntity entity, SyncCopyDto dto) {
         entity.setReleaseId(dto.releaseId());
+        entity.setPendingBarcode(dto.pendingBarcode());
         entity.setManualTitle(dto.manualTitle());
         entity.setManualArtist(dto.manualArtist());
         entity.setManualYear(dto.manualYear());
@@ -533,6 +587,7 @@ public class SyncService {
         return new SyncCopyDto(
                 entity.getId().toString(),
                 entity.getReleaseId(),
+                entity.getPendingBarcode(),
                 entity.getManualTitle(),
                 entity.getManualArtist(),
                 entity.getManualYear(),

@@ -36,6 +36,15 @@ public class OAuthStateEntity {
     @Column(nullable = false)
     private OAuthClient client;
 
+    /**
+     * SHA-256 of the secret handed to the browser that began this flow, which that browser
+     * has to present again for the callback to be completed. Without it the state is a
+     * bearer token, and a callback URL an attacker holds is a session anybody can be walked
+     * into. Null only for a row that predates the column.
+     */
+    @Column(name = "binding_hash")
+    private String bindingHash;
+
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 

@@ -3,11 +3,13 @@ package com.rekordo.controller.v1.schema;
 import com.rekordo.model.action.OAuthExchangeRequest;
 import com.rekordo.model.core.AuthProviderDto;
 import com.rekordo.model.core.SessionDto;
+import com.rekordo.services.auth.oauth.OAuthStateCookieFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,9 +40,10 @@ public interface OAuthApi {
     @GetMapping("/oauth/{provider}/authorize")
     @Operation(
             summary = "Begin an external sign-in",
-            description = "Redirects to the provider. Navigate to this, never fetch it. "
-                    + "`client=mobile` finishes the flow by reopening the native app with a "
-                    + "one-time code instead of setting the browser's refresh cookie.")
+            description = "Redirects to the provider. Navigate to this, never fetch it -- it "
+                    + "sets the cookie that ties the flow to this browser, and a fetched "
+                    + "redirect keeps it. `client=mobile` finishes the flow by reopening the "
+                    + "native app with a one-time code instead of setting the refresh cookie.")
     @ApiResponse(responseCode = "302", description = "Redirect to the provider")
     ResponseEntity<Void> authorize(
             @PathVariable String provider, @RequestParam(required = false) String client);
@@ -56,7 +59,8 @@ public interface OAuthApi {
             @PathVariable String provider,
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String state,
-            @RequestParam(required = false) String error);
+            @RequestParam(required = false) String error,
+            @CookieValue(name = OAuthStateCookieFactory.COOKIE_NAME, required = false) String binding);
 
     @PostMapping("/oauth/{provider}/callback")
     @Operation(
@@ -70,7 +74,8 @@ public interface OAuthApi {
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String error,
-            @RequestParam(required = false) String user);
+            @RequestParam(required = false) String user,
+            @CookieValue(name = OAuthStateCookieFactory.COOKIE_NAME, required = false) String binding);
 
     @PostMapping("/oauth/exchange")
     @Operation(

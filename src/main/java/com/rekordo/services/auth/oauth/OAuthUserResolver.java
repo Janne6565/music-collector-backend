@@ -45,7 +45,7 @@ public class OAuthUserResolver {
                     .orElseThrow(() -> new OAuthFailedException("That account no longer exists."));
         }
 
-        Resolved resolved = linkOrCreate(identity);
+        Resolved resolved = linkOrCreate(provider, identity);
         UserEntity user = resolved.user();
 
         OAuthIdentityEntity link = new OAuthIdentityEntity();
@@ -70,12 +70,22 @@ public class OAuthUserResolver {
     /** Whether the account was made here decides who, if anyone, needs telling. */
     private record Resolved(UserEntity user, boolean created) {}
 
-    private Resolved linkOrCreate(OAuthService.ExternalIdentity identity) {
+    private Resolved linkOrCreate(String provider, OAuthService.ExternalIdentity identity) {
         if (identity.email() != null) {
             // Linking on a verified e-mail is what lets someone who signed up with a
             // password later use the button without ending up with two collections.
             var byEmail = userRepository.findByEmailIgnoreCase(identity.email());
             if (byEmail.isPresent()) {
+                // And "verified" has to mean it. A provider that has not proved the address
+                // is only repeating something somebody typed into it, so linking on one would
+                // hand this account to whoever typed it. Refused rather than made into a
+                // second account: the address is taken, and there is exactly one person who
+                // can already get in with it.
+                if (!identity.emailVerified()) {
+                    log.warn("Refused to link an unverified {} address to an existing account", provider);
+                    throw new OAuthFailedException(
+                            "That address already has an account. Sign in the way it was made.");
+                }
                 return new Resolved(byEmail.get(), false);
             }
         }
@@ -87,8 +97,10 @@ public class OAuthUserResolver {
         user.setEmail(identity.email() == null ? identity.subject() + "@no-email.invalid" : identity.email());
         // Confirmed by the provider, which is the same trust this class already places in a
         // provider address when it links one to an account that exists. A withheld address
-        // gets a placeholder instead, and a placeholder has confirmed nothing.
-        user.setEmailVerifiedAt(identity.email() == null ? null : Instant.now());
+        // gets a placeholder instead, and a placeholder has confirmed nothing -- and neither
+        // has an address the provider handed over without saying it had proved it, which
+        // leaves the account to confirm its own the ordinary way.
+        user.setEmailVerifiedAt(identity.email() != null && identity.emailVerified() ? Instant.now() : null);
         // No password: this account can only be reached through the provider until
         // somebody sets one.
         user.setPasswordHash(null);
