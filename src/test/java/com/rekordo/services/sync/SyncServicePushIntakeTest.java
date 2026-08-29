@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
@@ -62,7 +63,8 @@ class SyncServicePushIntakeTest {
                 storageService,
                 activityService,
                 metadataService,
-                new ObjectMapper());
+                new ObjectMapper(),
+                new SimpleMeterRegistry());
         when(copyRepository.nextSyncSeq()).thenReturn(1L);
         when(wishlistItemRepository.findAllByUserIdAndIdIn(any(), anyList())).thenReturn(List.of());
         when(photoRepository.findAllByUserIdAndIdIn(any(), anyList())).thenReturn(List.of());

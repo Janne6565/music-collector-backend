@@ -14,6 +14,8 @@ import com.rekordo.model.core.CopyOrigin;
 import com.rekordo.repository.WishlistItemRepository;
 import com.rekordo.services.metadata.MetadataService;
 import com.rekordo.services.social.ActivityService;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +56,7 @@ public class SyncService {
     private final ActivityService activityService;
     private final MetadataService metadataService;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
     @Transactional(readOnly = true)
     public SyncPullDto pull(UUID userId, long since) {
@@ -239,14 +242,34 @@ public class SyncService {
      */
     private boolean storable(String kind, String id, Long createdAt) {
         if (idOf(id) == null) {
-            log.warn("Dropping {} from push: id {} is not a UUID", kind, id);
+            drop(kind, "malformed_id", id);
             return false;
         }
         if (createdAt == null) {
-            log.warn("Dropping {} {} from push: no createdAt", kind, id);
+            drop(kind, "no_created_at", id);
             return false;
         }
         return true;
+    }
+
+    /**
+     * Records a record thrown away, and says which kind and why.
+     *
+     * <p>Counted, not only logged. Before this, an unstorable row announced itself as a 500
+     * on every push -- loud, and impossible to miss once anybody looked. Dropping it instead
+     * is the right behaviour but it is also silent: the client hears success, the user sees
+     * their record on the device that made it, and nothing anywhere says it did not
+     * replicate. This counter is the only thing standing between that and a repeat of the
+     * bug it was written for, so it is worth an alert on any non-zero rate.
+     */
+    private void drop(String kind, String reason, String id) {
+        log.warn("Dropping {} {} from push: {}", kind, id, reason);
+        Counter.builder("rekordo.sync.push.dropped")
+                .description("Records a push had to throw away because they cannot be stored")
+                .tag("kind", kind)
+                .tag("reason", reason)
+                .register(meterRegistry)
+                .increment();
     }
 
     /**
@@ -262,7 +285,7 @@ public class SyncService {
             return false;
         }
         if (photo.storageKey() == null && photo.deletedAt() == null) {
-            log.warn("Dropping photo {} from push: live but has no storage key", photo.id());
+            drop("photo", "live_without_storage_key", photo.id());
             return false;
         }
         return true;

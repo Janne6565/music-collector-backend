@@ -118,6 +118,34 @@ management:
     health:
       probes:
         enabled: true
+  # No resource attributes here on purpose. Micrometer's OtlpConfig reads OTEL_SERVICE_NAME
+  # and OTEL_RESOURCE_ATTRIBUTES straight from the environment, which is the same pair the
+  # tracing agent reads -- so one setting in the config map names this service for both
+  # signals and they cannot drift apart. Spring's own `management.opentelemetry.*` keys do
+  # not exist without the OpenTelemetry starter, and an unknown key is ignored in silence.
+  otlp:
+    metrics:
+      export:
+        # Off is the local default: a laptop should not write into the cluster's telemetry
+        # store. The URL is only read when enabled, and it must be the OTLP-*HTTP* port with
+        # its scheme and path -- this registry speaks HTTP/protobuf, not gRPC, so pointing
+        # it at the agent's 4317 endpoint fails at runtime rather than at startup.
+        enabled: ${MC_OTLP_METRICS_ENABLED:false}
+        url: ${MC_OTLP_METRICS_URL:http://localhost:4318/v1/metrics}
+        step: 30s
+  metrics:
+    distribution:
+      # Without this a timer ships only count and sum, and every latency question can be
+      # answered with a mean and nothing else -- which is exactly the statistic that hides
+      # the slow tail everybody actually cares about.
+      percentiles-histogram:
+        http.server.requests: true
+        http.client.requests: true
+      # The client histogram is for the metadata APIs, whose slow calls are seconds rather
+      # than milliseconds. The default range would put every one of them in the top bucket.
+      maximum-expected-value:
+        http.server.requests: 10s
+        http.client.requests: 30s
 
 springdoc:
   swagger-ui:
