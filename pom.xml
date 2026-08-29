@@ -111,6 +111,17 @@
 			<artifactId>micrometer-registry-otlp</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!--
+			Not optional, and not obvious: Boot 4 guards OtlpMetricsExportAutoConfiguration on
+			a class from this module, so without it the registry above is never created. No
+			error, no warning, no export: the app just publishes nothing, which is a long way
+			to work out from the outside.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-opentelemetry</artifactId>
+			<scope>runtime</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
