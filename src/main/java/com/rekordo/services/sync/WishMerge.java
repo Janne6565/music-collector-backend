@@ -20,6 +20,7 @@ public final class WishMerge {
     public static final List<String> MERGEABLE_FIELDS = List.of(
             "albumId",
             "releaseId",
+            "pendingBarcode",
             "title",
             "artistName",
             "year",
@@ -60,6 +61,7 @@ public final class WishMerge {
                 local.id(),
                 (String) values.get("albumId"),
                 (String) values.get("releaseId"),
+                (String) values.get("pendingBarcode"),
                 (String) values.get("title"),
                 (String) values.get("artistName"),
                 (Integer) values.get("year"),
@@ -90,6 +92,7 @@ public final class WishMerge {
         return switch (field) {
             case "albumId" -> wish.albumId();
             case "releaseId" -> wish.releaseId();
+            case "pendingBarcode" -> wish.pendingBarcode();
             case "title" -> wish.title();
             case "artistName" -> wish.artistName();
             case "year" -> wish.year();

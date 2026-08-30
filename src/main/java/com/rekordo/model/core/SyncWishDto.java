@@ -14,6 +14,8 @@ public record SyncWishDto(
         @JsonAlias("releaseGroupMbid") String albumId,
         /** The pressing the entry was made from, or null. Absent from an older client. */
         String releaseId,
+        /** Mirrors {@code SyncCopyDto#pendingBarcode}. */
+        String pendingBarcode,
         String title,
         String artistName,
         Integer year,

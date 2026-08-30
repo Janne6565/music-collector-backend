@@ -23,6 +23,13 @@ public record SyncCopyDto(
          */
         @JsonAlias("releaseMbid") String releaseId,
         /**
+         * The digits of a scan that has not been identified yet, or null once it has.
+         *
+         * Null from any client older than the field, which reads as "nothing pending" —
+         * the only state such a client can produce.
+         */
+        String pendingBarcode,
+        /**
          * The pressing, as it was typed in, when {@code releaseId} is
          * {@code local:<this copy's id>} and no catalogue has the record.
          *

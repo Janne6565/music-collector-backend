@@ -36,6 +36,7 @@ public final class CopyMerge {
             "manualLabel",
             "manualCatalogNumber",
             "manualFormat",
+            "pendingBarcode",
             "condition",
             "sleeveCondition",
             "catalogArt",
@@ -82,6 +83,7 @@ public final class CopyMerge {
         return new SyncCopyDto(
                 local.id(),
                 (String) values.get("releaseId"),
+                (String) values.get("pendingBarcode"),
                 (String) values.get("manualTitle"),
                 (String) values.get("manualArtist"),
                 (Integer) values.get("manualYear"),
@@ -162,6 +164,7 @@ public final class CopyMerge {
             case "manualLabel" -> copy.manualLabel();
             case "manualCatalogNumber" -> copy.manualCatalogNumber();
             case "manualFormat" -> copy.manualFormat();
+            case "pendingBarcode" -> copy.pendingBarcode();
             case "condition" -> copy.condition();
             case "sleeveCondition" -> copy.sleeveCondition();
             case "catalogArt" -> copy.catalogArt();

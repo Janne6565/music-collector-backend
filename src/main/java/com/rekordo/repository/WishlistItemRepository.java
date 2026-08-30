@@ -16,14 +16,21 @@ public interface WishlistItemRepository extends JpaRepository<WishlistItemEntity
 
     List<WishlistItemEntity> findAllByUserIdAndIdIn(UUID userId, Collection<UUID> ids);
 
+    /**
+     * What someone else may see of a wishlist. Entries still waiting for a name are left
+     * out for the same reason pending copies are — see {@code CopyRepository.findVisible}.
+     */
     @Query("""
             SELECT w FROM WishlistItemEntity w
-            WHERE w.userId = :userId AND w.deletedAt IS NULL
+            WHERE w.userId = :userId AND w.deletedAt IS NULL AND w.pendingBarcode IS NULL
             ORDER BY w.createdAt DESC
             """)
     List<WishlistItemEntity> findVisible(@Param("userId") UUID userId, Pageable pageable);
 
-    @Query("SELECT COUNT(w) FROM WishlistItemEntity w WHERE w.userId = :userId AND w.deletedAt IS NULL")
+    @Query("""
+            SELECT COUNT(w) FROM WishlistItemEntity w
+            WHERE w.userId = :userId AND w.deletedAt IS NULL AND w.pendingBarcode IS NULL
+            """)
     long countVisible(@Param("userId") UUID userId);
 
     /** Whether this album is one they have been hunting for. */

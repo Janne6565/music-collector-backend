@@ -29,6 +29,17 @@ public class CopyEntity {
     private String releaseId;
 
     /**
+     * The barcode of a scan nobody could look up yet, or null once the record has a name.
+     *
+     * Written by whichever client made the scan and cleared by whichever one identifies
+     * it; the server only carries it. Nullable and unindexed: it is null on all but a
+     * handful of rows, and the question "what is still waiting?" is asked by a client of
+     * its own store, never of this table.
+     */
+    @Column(name = "pending_barcode")
+    private String pendingBarcode;
+
+    /**
      * What a hand-entered copy says about its own pressing, all null on a matched one.
      *
      * On the copy rather than in the `releases` mirror because they are the user's data:

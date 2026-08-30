@@ -116,6 +116,7 @@ class CopyMergeTest {
         return new SyncCopyDto(
                 id,
                 copy.releaseId(),
+                copy.pendingBarcode(),
                 copy.manualTitle(),
                 copy.manualArtist(),
                 copy.manualYear(),

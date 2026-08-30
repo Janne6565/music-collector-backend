@@ -30,6 +30,7 @@ class WishMergeTest {
                 "w1",
                 "group-1",
                 "discogs:1",
+                null,
                 "Ege Bamyasi",
                 "Can",
                 1972,
@@ -69,10 +70,10 @@ class WishMergeTest {
     @Test
     void theHandSortedPositionIsAnOrdinaryMergeableField() {
         SyncWishDto here = new SyncWishDto(
-                "w1", "g", null, "T", "A", null, null, null, 0, 1L, null,
+                "w1", "g", null, null, "T", "A", null, null, null, 0, 1L, null,
                 clocks("sortIndex", "000000000009000:0000:a"));
         SyncWishDto there = new SyncWishDto(
-                "w1", "g", null, "T", "A", null, null, null, 7, 1L, null,
+                "w1", "g", null, null, "T", "A", null, null, null, 7, 1L, null,
                 clocks("sortIndex", "000000000008000:0000:b"));
 
         assertThat(WishMerge.merge(here, there).sortIndex()).isEqualTo(0);
@@ -97,8 +98,8 @@ class WishMergeTest {
 
     @Test
     void takesTheEarlierCreationTime() {
-        SyncWishDto early = new SyncWishDto("w1", "g", null, "T", "A", null, null, null, null, 300L, null, clocks());
-        SyncWishDto late = new SyncWishDto("w1", "g", null, "T", "A", null, null, null, null, 900L, null, clocks());
+        SyncWishDto early = new SyncWishDto("w1", "g", null, null, "T", "A", null, null, null, null, 300L, null, clocks());
+        SyncWishDto late = new SyncWishDto("w1", "g", null, null, "T", "A", null, null, null, null, 900L, null, clocks());
 
         assertThat(WishMerge.merge(early, late).createdAt()).isEqualTo(300L);
     }
@@ -112,6 +113,7 @@ class WishMergeTest {
                 "w1",
                 "group-1",
                 "discogs:2",
+                null,
                 "Ege Bamyasi",
                 "Can",
                 1972,
@@ -133,7 +135,7 @@ class WishMergeTest {
         Map<String, String> silent = clocks();
         silent.remove("releaseId");
         SyncWishDto older = new SyncWishDto(
-                "w1", "group-1", null, "Ege Bamyasi", "Can", 1972, "VINYL", "n", null, 1000L, null, silent);
+                "w1", "group-1", null, null, "Ege Bamyasi", "Can", 1972, "VINYL", "n", null, 1000L, null, silent);
         SyncWishDto picked = wish("n", "VINYL", null, clocks());
 
         assertThat(WishMerge.merge(picked, older).releaseId()).isEqualTo("discogs:1");
@@ -142,7 +144,7 @@ class WishMergeTest {
     @Test
     void refusesToMergeTwoDifferentWishes() {
         SyncWishDto one = wish("n", "VINYL", null, clocks());
-        SyncWishDto other = new SyncWishDto("w2", "g", null, "T", "A", null, null, null, null, 1L, null, clocks());
+        SyncWishDto other = new SyncWishDto("w2", "g", null, null, "T", "A", null, null, null, null, 1L, null, clocks());
 
         assertThatThrownBy(() -> WishMerge.merge(one, other)).isInstanceOf(IllegalArgumentException.class);
     }
@@ -150,7 +152,7 @@ class WishMergeTest {
     @Test
     void keepsWishesThatExistOnOnlyOneSide() {
         SyncWishDto shared = wish("n", "VINYL", null, clocks());
-        SyncWishDto onlyRemote = new SyncWishDto("w2", "g", null, "T", "A", null, null, null, null, 1L, null, clocks());
+        SyncWishDto onlyRemote = new SyncWishDto("w2", "g", null, null, "T", "A", null, null, null, null, 1L, null, clocks());
 
         List<SyncWishDto> merged = WishMerge.mergeAll(List.of(shared), List.of(shared, onlyRemote));
 

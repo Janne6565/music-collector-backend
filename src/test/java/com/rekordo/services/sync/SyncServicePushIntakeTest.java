@@ -73,7 +73,7 @@ class SyncServicePushIntakeTest {
     }
 
     private SyncWishDto wish(String id) {
-        return new SyncWishDto(id, "group", null, "T", "A", null, null, null, null, 1L, null, Map.of());
+        return new SyncWishDto(id, "group", null, null, "T", "A", null, null, null, null, 1L, null, Map.of());
     }
 
     /** A picture deleted before its upload finished: no key, and never getting one. */
@@ -112,7 +112,8 @@ class SyncServicePushIntakeTest {
         // it, over and over, because the client cannot tell a rejection from an outage.
         SyncWishDto good = wish(UUID.randomUUID().toString());
         SyncWishDto noCreatedAt =
-                new SyncWishDto(UUID.randomUUID().toString(), "group", null, "T", "A", null, null, null, null, null, null, Map.of());
+                new SyncWishDto(
+                        UUID.randomUUID().toString(), "group", null, null, "T", "A", null, null, null, null, null, null, Map.of());
         SyncWishDto notAUuid = wish("not-a-uuid");
 
         SyncPullDto result =

@@ -21,13 +21,19 @@ public interface CopyRepository extends JpaRepository<CopyEntity, UUID> {
     long nextSyncSeq();
 
     /**
-     * What someone else is allowed to see: alive, not hidden one by one, oldest change
-     * last. The filter lives in the query rather than in a stream afterwards so that no
-     * caller can forget it.
+     * What someone else is allowed to see: alive, not hidden one by one, not still waiting
+     * to find out what it is, oldest change last. The filter lives in the query rather
+     * than in a stream afterwards so that no caller can forget it.
+     *
+     * <p>A copy with a pending barcode is a scan the owner's phone has not been able to
+     * look up yet. On their own shelf it is a row that says so and names its digits; on
+     * somebody else's screen it would be an "Untitled" placeholder that neither person can
+     * act on, and it stops being one the moment any of the owner's devices gets a signal.
      */
     @Query("""
             SELECT c FROM CopyEntity c
             WHERE c.userId = :userId AND c.deletedAt IS NULL AND c.hidden = FALSE
+              AND c.pendingBarcode IS NULL
             ORDER BY c.createdAt DESC
             """)
     List<CopyEntity> findVisible(@Param("userId") UUID userId, Pageable pageable);
@@ -35,6 +41,7 @@ public interface CopyRepository extends JpaRepository<CopyEntity, UUID> {
     @Query("""
             SELECT COUNT(c) FROM CopyEntity c
             WHERE c.userId = :userId AND c.deletedAt IS NULL AND c.hidden = FALSE
+              AND c.pendingBarcode IS NULL
             """)
     long countVisible(@Param("userId") UUID userId);
 

@@ -36,6 +36,10 @@ public class WishlistItemEntity {
     @Column(name = "release_id")
     private String releaseId;
 
+    /** Mirrors {@code CopyEntity.pendingBarcode}: a scan sent here before it had a name. */
+    @Column(name = "pending_barcode")
+    private String pendingBarcode;
+
     @Column(nullable = false)
     private String title;
 
