@@ -108,6 +108,16 @@ public class AuthController implements AuthApi {
 
     @Override
     public ResponseEntity<Void> logout() {
+        // Only this device. The refresh token is stateless, so clearing the cookie is what
+        // ends the session — and the phone's, minted from the same account, is none of this
+        // request's business. Ending all of them is `logout-all`, which somebody chooses.
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, refreshCookieFactory.clear().toString())
+                .build();
+    }
+
+    @Override
+    public ResponseEntity<Void> logoutEverywhere() {
         authService.signOutEverywhere(currentUser.require());
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, refreshCookieFactory.clear().toString())

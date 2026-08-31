@@ -65,10 +65,20 @@ public interface AuthApi {
 
     @PostMapping("/logout")
     @Operation(
-            summary = "Sign out on every device",
-            description = "Clears the refresh cookie and invalidates all outstanding refresh tokens.")
+            summary = "Sign out on this device",
+            description = "Clears the refresh cookie. Sessions on other devices are left alone — "
+                    + "signing out of a browser is not a statement about a phone.")
     @ApiResponse(responseCode = "204", description = "Signed out")
     ResponseEntity<Void> logout();
+
+    @PostMapping("/logout-all")
+    @Operation(
+            summary = "Sign out everywhere",
+            description = "Invalidates every outstanding refresh token for this account, on every "
+                    + "device, and clears this one's cookie. The deliberate version of what logout "
+                    + "used to do to everybody.")
+    @ApiResponse(responseCode = "204", description = "Signed out everywhere")
+    ResponseEntity<Void> logoutEverywhere();
 
     @PostMapping("/forgot-password")
     @Operation(
