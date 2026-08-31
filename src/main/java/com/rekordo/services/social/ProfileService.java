@@ -99,6 +99,7 @@ public class ProfileService {
                 owner.getDisplayName(),
                 AvatarService.urlFor(owner),
                 friendshipService.relationship(viewerId, owner.getId()),
+                friendshipService.incomingRequestId(viewerId, owner.getId()).orElse(null),
                 collection,
                 visibilityService.canSeeWishlist(viewerId, owner.getId()),
                 visibilityService.canSeePrices(viewerId, owner.getId()),

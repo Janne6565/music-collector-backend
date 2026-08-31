@@ -173,6 +173,26 @@ class FriendshipServiceTest {
     }
 
     @Test
+    void handsTheRequestIdOnlyToThePersonWhoWasAsked() {
+        FriendshipEntity request = pending(ASKER, ASKED);
+        when(friendshipRepository.findBetween(ASKER, ASKED)).thenReturn(Optional.of(request));
+        when(friendshipRepository.findBetween(ASKED, ASKER)).thenReturn(Optional.of(request));
+
+        // The one who was asked can answer it; the one who asked has nothing to answer.
+        assertThat(service.incomingRequestId(ASKED, ASKER)).contains(REQUEST);
+        assertThat(service.incomingRequestId(ASKER, ASKED)).isEmpty();
+    }
+
+    @Test
+    void hasNoRequestToAnswerOnceItIsAccepted() {
+        FriendshipEntity accepted = pending(ASKER, ASKED);
+        accepted.setStatus(FriendshipStatus.ACCEPTED);
+        when(friendshipRepository.findBetween(ASKED, ASKER)).thenReturn(Optional.of(accepted));
+
+        assertThat(service.incomingRequestId(ASKED, ASKER)).isEmpty();
+    }
+
+    @Test
     void hasNoRelationshipToOfferSomebodyWhoIsNotSignedIn() {
         assertThat(service.relationship(null, ASKED)).isEqualTo(RelationshipDto.ANONYMOUS);
     }

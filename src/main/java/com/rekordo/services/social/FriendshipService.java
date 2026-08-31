@@ -147,6 +147,25 @@ public class FriendshipService {
                 .orElse(RelationshipDto.NONE);
     }
 
+    /**
+     * The id of the request the other person sent this viewer, when there is one.
+     *
+     * <p>A profile is looked up by handle, but accepting and declining name the request
+     * itself — so without this the one screen that says "@janne2 asked to be friends" has
+     * no way to answer it, and the button on it can only ask again.
+     */
+    @Transactional(readOnly = true)
+    public Optional<UUID> incomingRequestId(UUID viewerId, UUID otherId) {
+        if (viewerId == null || viewerId.equals(otherId)) {
+            return Optional.empty();
+        }
+        return friendshipRepository
+                .findBetween(viewerId, otherId)
+                .filter(friendship -> friendship.getStatus() == FriendshipStatus.PENDING)
+                .filter(friendship -> friendship.getAddresseeId().equals(viewerId))
+                .map(FriendshipEntity::getId);
+    }
+
     @Transactional(readOnly = true)
     public boolean areFriends(UUID a, UUID b) {
         if (a == null || b == null) {

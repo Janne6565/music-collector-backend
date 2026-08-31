@@ -22,6 +22,13 @@ public record ProfileDto(
          */
         String avatarUrl,
         RelationshipDto relationship,
+        /**
+         * The request waiting for this viewer's answer, or null. Set only for
+         * {@link RelationshipDto#REQUEST_RECEIVED}: accepting and declining name the
+         * request, while a profile is looked up by handle, so without it the screen that
+         * shows the ask has no way to answer it.
+         */
+        UUID pendingRequestId,
         boolean canSeeCollection,
         boolean canSeeWishlist,
         /** Whether prices ride along with the copies. Off even on a public shelf by default. */
