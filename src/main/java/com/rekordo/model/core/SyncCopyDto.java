@@ -23,6 +23,15 @@ public record SyncCopyDto(
          */
         @JsonAlias("releaseMbid") String releaseId,
         /**
+         * The album, or null from a client older than the field.
+         *
+         * Absent rather than wrong on an old client, and absent never wins a merge -- see
+         * {@code CopyMerge.remoteWins}, which keeps the server's value when the incoming
+         * side carries no clock for a field. So an old client pushing a copy it has held
+         * for months cannot detach it from its album.
+         */
+        String albumId,
+        /**
          * The digits of a scan that has not been identified yet, or null once it has.
          *
          * Null from any client older than the field, which reads as "nothing pending" —

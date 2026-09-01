@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -75,7 +76,7 @@ class ActivityServiceTest {
     @ParameterizedTest
     @EnumSource(value = CopyOrigin.class, names = {"CSV_IMPORT", "FIRST_SYNC"})
     void saysNothingAboutCopiesThatArrivedInABatch(CopyOrigin origin) {
-        service.recordCopyAdded(FRIEND, UUID.randomUUID(), origin, "musicbrainz:r1", "Aja", "Steely Dan", 1L);
+        service.recordCopyAdded(FRIEND, UUID.randomUUID(), origin, "musicbrainz:r1", null, "Aja", "Steely Dan", 1L);
 
         verify(activityRepository, never()).save(any());
     }
@@ -84,14 +85,14 @@ class ActivityServiceTest {
     void saysNothingWhenTheClientDidNotSayWhyTheCopyExists() {
         // Silence is the safe failure mode: a client too old to send an origin must not be
         // able to announce somebody's entire collection.
-        service.recordCopyAdded(FRIEND, UUID.randomUUID(), null, "musicbrainz:r1", "Aja", "Steely Dan", 1L);
+        service.recordCopyAdded(FRIEND, UUID.randomUUID(), null, "musicbrainz:r1", null, "Aja", "Steely Dan", 1L);
 
         verify(activityRepository, never()).save(any());
     }
 
     @Test
     void announcesACopySomebodyAddedByHand() {
-        service.recordCopyAdded(FRIEND, UUID.randomUUID(), CopyOrigin.MANUAL, "local:x", "Aja", "Steely Dan", 1L);
+        service.recordCopyAdded(FRIEND, UUID.randomUUID(), CopyOrigin.MANUAL, "local:x", null, "Aja", "Steely Dan", 1L);
 
         assertThat(saved().getType()).isEqualTo(ActivityType.COPY_ADDED);
     }
@@ -101,7 +102,7 @@ class ActivityServiceTest {
         // A copy added on a plane and synced two days later belongs where the person put it.
         Instant twoDaysAgo = Instant.now().minus(Duration.ofDays(2));
         service.recordCopyAdded(
-                FRIEND, UUID.randomUUID(), CopyOrigin.MANUAL, "local:x", "Aja", "Steely Dan", twoDaysAgo.toEpochMilli());
+                FRIEND, UUID.randomUUID(), CopyOrigin.MANUAL, "local:x", null, "Aja", "Steely Dan", twoDaysAgo.toEpochMilli());
 
         assertThat(saved().getOccurredAt()).isCloseTo(twoDaysAgo, org.assertj.core.api.Assertions.within(1, java.time.temporal.ChronoUnit.SECONDS));
     }
@@ -111,9 +112,28 @@ class ActivityServiceTest {
         // Otherwise one badly-set clock pins a line to the top of every friend's feed forever.
         Instant nextYear = Instant.now().plus(Duration.ofDays(365));
         service.recordCopyAdded(
-                FRIEND, UUID.randomUUID(), CopyOrigin.MANUAL, "local:x", "Aja", "Steely Dan", nextYear.toEpochMilli());
+                FRIEND, UUID.randomUUID(), CopyOrigin.MANUAL, "local:x", null, "Aja", "Steely Dan", nextYear.toEpochMilli());
 
         assertThat(saved().getOccurredAt()).isBeforeOrEqualTo(Instant.now());
+    }
+
+    @Test
+    void callsItAFindFromTheCopysOwnAlbumWithoutResolvingAPressing() {
+        // A copy whose owner never chose a pressing has no release to walk up from, and one
+        // that did should not need the mirror to have cached it. Both ask the album directly.
+        when(wishlistItemRepository.findAllByUserIdAndAlbumIdAndDeletedAtIsNull(FRIEND, "musicbrainz:g1"))
+                .thenReturn(List.of(new com.rekordo.entity.WishlistItemEntity()));
+
+        service.recordCopyAdded(
+                FRIEND, UUID.randomUUID(), CopyOrigin.MANUAL, null, "musicbrainz:g1", "Aja", "Steely Dan", 1L);
+
+        assertThat(saved()).satisfies(event -> {
+            assertThat(event.getType()).isEqualTo(ActivityType.WISH_FULFILLED);
+            // The feed draws its record through getReleases, which answers for an album id,
+            // so the album stands in for the pressing nobody picked.
+            assertThat(event.getReleaseId()).isEqualTo("musicbrainz:g1");
+        });
+        verifyNoInteractions(releaseRepository);
     }
 
     @Test
@@ -130,7 +150,7 @@ class ActivityServiceTest {
         when(wishlistItemRepository.findAllByUserIdAndAlbumIdAndDeletedAtIsNull(FRIEND, "musicbrainz:g1"))
                 .thenReturn(List.of(new com.rekordo.entity.WishlistItemEntity()));
 
-        service.recordCopyAdded(FRIEND, UUID.randomUUID(), CopyOrigin.MANUAL, "musicbrainz:r1", null, null, 1L);
+        service.recordCopyAdded(FRIEND, UUID.randomUUID(), CopyOrigin.MANUAL, "musicbrainz:r1", null, null, null, 1L);
 
         assertThat(saved()).satisfies(event -> {
             assertThat(event.getType()).isEqualTo(ActivityType.WISH_FULFILLED);

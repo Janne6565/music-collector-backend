@@ -440,6 +440,7 @@ public class SyncService {
                 copyId,
                 originOf(origins, merged.id()),
                 merged.releaseId(),
+                merged.albumId(),
                 merged.manualTitle(),
                 merged.manualArtist(),
                 merged.createdAt());
@@ -558,6 +559,7 @@ public class SyncService {
 
     private void apply(CopyEntity entity, SyncCopyDto dto) {
         entity.setReleaseId(dto.releaseId());
+        entity.setAlbumId(dto.albumId());
         entity.setPendingBarcode(dto.pendingBarcode());
         entity.setManualTitle(dto.manualTitle());
         entity.setManualArtist(dto.manualArtist());
@@ -587,6 +589,7 @@ public class SyncService {
         return new SyncCopyDto(
                 entity.getId().toString(),
                 entity.getReleaseId(),
+                entity.getAlbumId(),
                 entity.getPendingBarcode(),
                 entity.getManualTitle(),
                 entity.getManualArtist(),

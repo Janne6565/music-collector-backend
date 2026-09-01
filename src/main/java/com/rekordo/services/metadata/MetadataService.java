@@ -656,6 +656,18 @@ public class MetadataService {
 
         List<ReleaseEntity> releases = releaseRepository.findAllByExternalIdIn(wanted);
 
+        // Whatever was asked for and is not a pressing is an album: a copy whose owner
+        // never chose one names its album here instead, and a second device pulling that
+        // copy has to be able to draw it. Answered from the album itself rather than by
+        // picking one of its pressings, because picking one is exactly what nobody did.
+        Set<String> unmatched = new LinkedHashSet<>(wanted);
+        releases.forEach(release -> unmatched.remove(release.getExternalId()));
+        List<ReleaseDto> albums = unmatched.isEmpty()
+                ? List.of()
+                : releaseGroupRepository.findAllByExternalIdIn(unmatched).stream()
+                        .map(MetadataService::asUnpressedRelease)
+                        .toList();
+
         // The album id every release carries, resolved in one query rather than per row: this
         // is the one path that maps a hundred releases at a time.
         Map<UUID, String> albumIds = new HashMap<>();
@@ -668,9 +680,41 @@ public class MetadataService {
             albumIds.put(group.getId(), group.getExternalId());
         }
 
-        return releases.stream()
-                .map(release -> MetadataMapper.toDto(release, albumIds.get(release.getReleaseGroupId())))
+        return java.util.stream.Stream.concat(
+                        releases.stream().map(release ->
+                                MetadataMapper.toDto(release, albumIds.get(release.getReleaseGroupId()))),
+                        albums.stream())
                 .toList();
+    }
+
+    /**
+     * An album, shaped as the release a copy of it would have had.
+     *
+     * <p>Everything a pressing knows and an album does not -- format, label, catalogue
+     * number, country, barcode -- is null, which is the truthful answer: nobody said. The
+     * clients already render those as absent, because a hand-entered copy has been able to
+     * leave them empty since the manual fields existed.
+     *
+     * <p>Its id is the album's, so it lands in the same map under the same key the copy
+     * looked it up by.
+     */
+    private static ReleaseDto asUnpressedRelease(ReleaseGroupEntity album) {
+        return new ReleaseDto(
+                album.getExternalId(),
+                album.getExternalId(),
+                album.getTitle(),
+                album.getArtistName(),
+                album.getFirstReleaseYear(),
+                Format.OTHER,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     /** Discogs' half of {@link #upsert}: mirror it once, then serve it from here. */

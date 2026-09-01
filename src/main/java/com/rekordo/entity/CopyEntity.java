@@ -25,8 +25,24 @@ public class CopyEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "release_id", nullable = false)
+    /**
+     * Which pressing, or null when nobody chose one.
+     *
+     * The album is what the person picked; a pressing is a refinement of it, and one most
+     * people never make. Before {@code album_id} the copy had nowhere to say so, and the
+     * pressing the catalogue ranked first was written down as though it had been chosen.
+     */
+    @Column(name = "release_id")
     private String releaseId;
+
+    /**
+     * The album this is a copy of, source-qualified, or null on a row older than the
+     * column whose pressing this server has never mirrored.
+     *
+     * The same pair {@code WishlistItemEntity} has always carried.
+     */
+    @Column(name = "album_id")
+    private String albumId;
 
     /**
      * The barcode of a scan nobody could look up yet, or null once the record has a name.

@@ -126,7 +126,12 @@ public class ProfileService {
         Map<UUID, UUID> previews = previewPhotos(owner.getId(), shown);
         List<SharedCopyDto> dtos = new ArrayList<>(shown.size());
         for (CopyEntity copy : shown) {
-            dtos.add(toDto(copy, releases.get(copy.getReleaseId()), previews.get(copy.getId()), prices, grades));
+            dtos.add(toDto(
+                    copy,
+                    releases.get(catalogueKeyOf(copy)),
+                    previews.get(copy.getId()),
+                    prices,
+                    grades));
         }
         return new SharedCollectionDto(dtos, copyRepository.countVisible(owner.getId()), truncated);
     }
@@ -215,7 +220,7 @@ public class ProfileService {
      */
     private Map<String, ReleaseDto> resolve(List<CopyEntity> copies) {
         List<String> ids = copies.stream()
-                .map(CopyEntity::getReleaseId)
+                .map(ProfileService::catalogueKeyOf)
                 .filter(id -> id != null && !id.startsWith("local:"))
                 .distinct()
                 .toList();
@@ -334,5 +339,17 @@ public class ProfileService {
             }
         }
         return "";
+    }
+
+    /**
+     * The key a copy's release facts live under: the pressing when one was chosen, the
+     * album otherwise.
+     *
+     * <p>A copy whose owner never picked a pressing still has to draw on a friend's shelf,
+     * and {@code MetadataService.getReleases} answers for an album id by describing the
+     * album itself.
+     */
+    private static String catalogueKeyOf(CopyEntity copy) {
+        return copy.getReleaseId() != null ? copy.getReleaseId() : copy.getAlbumId();
     }
 }

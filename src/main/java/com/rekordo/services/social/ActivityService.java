@@ -89,7 +89,14 @@ public class ActivityService {
      */
     @Transactional
     public void recordCopyAdded(
-            UUID actorId, UUID copyId, CopyOrigin origin, String releaseId, String title, String artist, Long occurredAt) {
+            UUID actorId,
+            UUID copyId,
+            CopyOrigin origin,
+            String releaseId,
+            String albumId,
+            String title,
+            String artist,
+            Long occurredAt) {
         if (origin != CopyOrigin.MANUAL) {
             // An import, a first sign-in, or a client that did not say. All silent.
             return;
@@ -101,8 +108,11 @@ public class ActivityService {
         }
         // "Off the wishlist, onto the shelf" is a better line than "added a copy", and it is
         // the same event -- so which one this is depends on whether they were hunting for it.
-        ActivityType type = wasWishedFor(actorId, releaseId) ? ActivityType.WISH_FULFILLED : ActivityType.COPY_ADDED;
-        save(actorId, type, copyId, releaseId, title, artist, null, occurredAt);
+        ActivityType type =
+                wasWishedFor(actorId, releaseId, albumId) ? ActivityType.WISH_FULFILLED : ActivityType.COPY_ADDED;
+        // The album when no pressing was chosen: the feed draws its record through
+        // MetadataService.getReleases, which answers for an album id by describing the album.
+        save(actorId, type, copyId, releaseId != null ? releaseId : albumId, title, artist, null, occurredAt);
     }
 
     /**
@@ -113,17 +123,27 @@ public class ActivityService {
      * simply never matches, which is the right answer -- nobody wishes for a pressing that
      * exists in one person's collection.
      */
-    private boolean wasWishedFor(UUID actorId, String releaseId) {
+    private boolean wasWishedFor(UUID actorId, String releaseId, String albumId) {
+        // A copy that knows its own album asks the question directly. Before the copy
+        // carried one this had to resolve the pressing first, so a wish went unmatched
+        // whenever this server had never mirrored the pressing that satisfied it.
+        if (albumId != null && !albumId.startsWith("local:")) {
+            return isWished(actorId, albumId);
+        }
         if (releaseId == null || releaseId.startsWith("local:")) {
             return false;
         }
         return releaseRepository
                 .findByExternalId(releaseId)
                 .flatMap(release -> releaseGroupRepository.findById(release.getReleaseGroupId()))
-                .map(group -> !wishlistItemRepository
-                        .findAllByUserIdAndAlbumIdAndDeletedAtIsNull(actorId, group.getExternalId())
-                        .isEmpty())
+                .map(group -> isWished(actorId, group.getExternalId()))
                 .orElse(false);
+    }
+
+    private boolean isWished(UUID actorId, String albumId) {
+        return !wishlistItemRepository
+                .findAllByUserIdAndAlbumIdAndDeletedAtIsNull(actorId, albumId)
+                .isEmpty();
     }
 
     /**
