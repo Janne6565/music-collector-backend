@@ -32,7 +32,8 @@ class CacheConfigTest {
                 CacheConfig.METADATA_SEARCH,
                 CacheConfig.ARTIST_DISCOGRAPHY,
                 CacheConfig.ALBUM_PRESSINGS,
-                CacheConfig.BARCODE_LOOKUP);
+                CacheConfig.BARCODE_LOOKUP,
+                CacheConfig.ARTIST_SEARCH);
         assertThat(names).allSatisfy(name -> assertThat(manager.getCache(name)).isNotNull());
         assertThat(names).doesNotHaveDuplicates();
     }
@@ -44,7 +45,8 @@ class CacheConfigTest {
                 CacheConfig.METADATA_SEARCH,
                 CacheConfig.ARTIST_DISCOGRAPHY,
                 CacheConfig.ALBUM_PRESSINGS,
-                CacheConfig.BARCODE_LOOKUP);
+                CacheConfig.BARCODE_LOOKUP,
+                CacheConfig.ARTIST_SEARCH);
 
         List<String> annotated = Arrays.stream(MetadataService.class.getDeclaredMethods())
                 .map(method -> method.getAnnotation(Cacheable.class))
@@ -54,8 +56,8 @@ class CacheConfigTest {
                 .toList();
 
         assertThat(annotated)
-                .as("the service is expected to cache the four paced upstream questions")
-                .hasSize(4)
+                .as("the service is expected to cache every paced upstream question")
+                .hasSize(5)
                 .allSatisfy(name -> assertThat(configured).contains(name));
     }
 
@@ -66,6 +68,7 @@ class CacheConfigTest {
         assertThat(cacheNameOf("findByBarcode")).isEqualTo(CacheConfig.BARCODE_LOOKUP);
         assertThat(cacheNameOf("albumsOfArtist")).isEqualTo(CacheConfig.ARTIST_DISCOGRAPHY);
         assertThat(cacheNameOf("releasesInGroup")).isEqualTo(CacheConfig.ALBUM_PRESSINGS);
+        assertThat(cacheNameOf("searchArtists")).isEqualTo(CacheConfig.ARTIST_SEARCH);
     }
 
     private static String cacheNameOf(String methodName) {

@@ -38,6 +38,17 @@ public class CacheConfig {
     public static final String ALBUM_PRESSINGS = "albumPressings";
 
     /**
+     * Artist name to artists.
+     *
+     * <p>The one MusicBrainz question left uncached when the other three were done, and the
+     * one asked most often: the add screen fires it beside every release search. Measured
+     * against production before this existed, six searches in a row cost 0.13s and then
+     * 0.86 to 1.15 seconds each -- the pacer, not the upstream -- and asking the same one
+     * again paid it a second time.
+     */
+    public static final String ARTIST_SEARCH = "artistSearch";
+
+    /**
      * Barcode to record.
      *
      * <p>The most stable question of the four -- the digits on a sleeve identify the same
@@ -55,6 +66,7 @@ public class CacheConfig {
         manager.registerCustomCache(ARTIST_DISCOGRAPHY, spec(2_000, Duration.ofHours(24)));
         manager.registerCustomCache(ALBUM_PRESSINGS, spec(5_000, Duration.ofHours(24)));
         manager.registerCustomCache(BARCODE_LOOKUP, spec(10_000, Duration.ofHours(24)));
+        manager.registerCustomCache(ARTIST_SEARCH, spec(2_000, Duration.ofHours(6)));
         return manager;
     }
 

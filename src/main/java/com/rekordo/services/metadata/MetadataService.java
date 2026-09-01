@@ -140,6 +140,7 @@ public class MetadataService {
      * requests a second apart, and a client that renders artists the moment they land reads
      * as faster than one that waits to show both at once.
      */
+    @Cacheable(cacheNames = CacheConfig.ARTIST_SEARCH)
     @Transactional(readOnly = true)
     public List<ArtistDto> searchArtists(String query, int limit) {
         return musicBrainzClient.searchArtists(query, limit).stream()
