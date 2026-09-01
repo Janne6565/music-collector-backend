@@ -113,6 +113,7 @@ public class MetadataService {
         }
     }
 
+    @Cacheable(cacheNames = CacheConfig.BARCODE_LOOKUP)
     @Transactional
     public List<ReleaseDto> findByBarcode(String barcode) {
         List<ReleaseEntity> known = releaseRepository.findAllByBarcode(barcode);
@@ -204,6 +205,7 @@ public class MetadataService {
      * The total is the count MusicBrainz reports for the query, not the size of the page —
      * a client showing "Albums 51" is telling the truth even though it only received 25.
      */
+    @Cacheable(cacheNames = CacheConfig.ARTIST_DISCOGRAPHY)
     @Transactional(readOnly = true)
     public Discography albumsOfArtist(UUID artistMbid, String primaryType, int limit) {
         String query = primaryType == null || primaryType.isBlank()
@@ -230,6 +232,7 @@ public class MetadataService {
      * Persisted on the way through like any other release, so adding one of them straight
      * from the pressing table works offline afterwards.
      */
+    @Cacheable(cacheNames = CacheConfig.ALBUM_PRESSINGS)
     @Transactional
     public List<ReleaseDto> releasesInGroup(String albumId, int limit) {
         ExternalRef ref = ExternalRef.parse(albumId);
