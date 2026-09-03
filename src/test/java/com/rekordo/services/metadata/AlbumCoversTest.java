@@ -109,6 +109,51 @@ class AlbumCoversTest {
     }
 
     @Test
+    void prefersTheArchivesAlbumAddressOverAnUnprobedPressing() {
+        // Reported from the examples plate: an album with two dozen illustrated pressings
+        // drew an empty square. The mirror held one MusicBrainz pressing, nobody had probed
+        // it, and its constructed Cover Art Archive URL happened to have nothing behind it.
+        // The release *group* address resolves to whichever release actually has a picture,
+        // so it is the better guess whenever the pressing's own is only a guess.
+        ReleaseGroupEntity album = group(MB_ALBUM);
+        mirror(
+                List.of(album),
+                List.of(release(album, "musicbrainz:80032220", "https://coverartarchive.org/release/80032220/front-500", null)));
+        when(coverArtClient.frontCoverUrlForGroup(any()))
+                .thenAnswer(call -> "https://coverartarchive.org/release-group/" + call.getArgument(0) + "/front-500");
+
+        assertThat(service.albumCovers(List.of(MB_ALBUM)))
+                .containsExactly(new AlbumCoverDto(
+                        MB_ALBUM,
+                        "https://coverartarchive.org/release-group/0f2d5a1e-4a1e-4e7a-9c1e-2f0d4b6a8c11/front-500"));
+    }
+
+    @Test
+    void keepsAConfirmedPressingAheadOfTheAlbumAddress() {
+        ReleaseGroupEntity album = group(MB_ALBUM);
+        mirror(
+                List.of(album),
+                List.of(release(album, "musicbrainz:1", "https://coverartarchive.org/release/1/front-500", true)));
+
+        assertThat(service.albumCovers(List.of(MB_ALBUM)))
+                .containsExactly(new AlbumCoverDto(MB_ALBUM, "https://coverartarchive.org/release/1/front-500"));
+        // No need to ask the archive about the group: a pressing already answered for certain.
+        verify(coverArtClient, never()).frontCoverUrlForGroup(any());
+    }
+
+    @Test
+    void stillDrawsAnUnprobedPressingWhenTheAlbumHasNoAddressOfItsOwn() {
+        // A Discogs album publishes no per-album image, so an unprobed pressing is the only
+        // answer there is -- better than a placeholder.
+        ReleaseGroupEntity album = group(DISCOGS_ALBUM);
+        mirror(List.of(album), List.of(release(album, "discogs:1", "https://img.discogs/1.jpg", null)));
+        when(discogsClient.servesImages()).thenReturn(false);
+
+        assertThat(service.albumCovers(List.of(DISCOGS_ALBUM)))
+                .containsExactly(new AlbumCoverDto(DISCOGS_ALBUM, "https://img.discogs/1.jpg"));
+    }
+
+    @Test
     void ignoresAPressingKnownToHaveNoArt() {
         ReleaseGroupEntity album = group(DISCOGS_ALBUM);
         mirror(List.of(album), List.of(release(album, "discogs:1", "https://img.discogs/1.jpg", false)));

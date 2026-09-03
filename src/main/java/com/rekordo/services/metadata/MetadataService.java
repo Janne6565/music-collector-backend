@@ -272,17 +272,18 @@ public class MetadataService {
      *
      * <p>An album is not a pressing and so has no cover of its own — a wishlist entry names
      * an album, which is why it arrives here with nothing to render. The answer is the cover
-     * of one of the album's releases: a pressing known to have art first, an unprobed one
-     * next, never one known to have none.
+     * of one of the album's releases: a pressing known to have art first, then the album's
+     * own address, then an unprobed pressing, and never one known to have none.
      *
      * <p>Nothing here calls a catalogue. A wishlist of thirty rows must not cost thirty
      * upstream requests, and the mirror already holds the pressing the entry was created
      * from — searching for a record is how it got onto the list in the first place.
      *
-     * <p>Where the mirror has nothing, a MusicBrainz album still has an address: the Cover
-     * Art Archive resolves a front cover per release group. Discogs publishes no such
-     * per-album image, so an unmirrored Discogs album answers null and the client draws its
-     * format placeholder — which is the same thing it does when the URL 404s.
+     * <p>Where the mirror has nothing confirmed, a MusicBrainz album still has an address:
+     * the Cover Art Archive resolves a front cover per release group, which is a better
+     * answer than an unprobed pressing's own URL — see {@link #preferredCover}. Discogs
+     * publishes no such per-album image, so an unmirrored Discogs album answers null and the
+     * client draws its format placeholder — which is the same thing it does when a URL 404s.
      */
     @Transactional
     public List<AlbumCoverDto> albumCovers(Collection<String> albumIds) {
@@ -300,7 +301,7 @@ public class MetadataService {
         for (ReleaseGroupEntity group : releaseGroupRepository.findAllByExternalIdIn(wanted.values())) {
             groups.put(group.getExternalId(), group);
         }
-        Map<UUID, String> mirrored = mirroredCovers(groups.values());
+        Map<UUID, MirroredCover> mirrored = mirroredCovers(groups.values());
 
         // Bounded per request: a page of a hundred unknown albums must not become a hundred
         // paced upstream calls with somebody waiting on the response. The rest come back
@@ -310,10 +311,13 @@ public class MetadataService {
         return wanted.entrySet().stream()
                 .map(entry -> {
                     ReleaseGroupEntity group = groups.get(entry.getValue());
-                    String cover = group == null ? null : mirrored.get(group.getId());
-                    return new AlbumCoverDto(
-                            entry.getKey(),
-                            cover != null ? cover : albumOwnCover(entry.getValue(), group, budget));
+                    MirroredCover cover = group == null ? null : mirrored.get(group.getId());
+                    // The album's own cover is asked for even when a pressing offered one,
+                    // unless that pressing's art is confirmed -- see preferredCover.
+                    String albumOwn = cover != null && cover.confirmed()
+                            ? null
+                            : albumOwnCover(entry.getValue(), group, budget);
+                    return new AlbumCoverDto(entry.getKey(), preferredCover(cover, albumOwn));
                 })
                 .toList();
     }
@@ -348,13 +352,13 @@ public class MetadataService {
         for (ReleaseGroupEntity group : releaseGroupRepository.findAllByExternalIdIn(wanted.values())) {
             groups.put(group.getExternalId(), group);
         }
-        Map<UUID, String> mirrored = mirroredCovers(groups.values());
+        Map<UUID, MirroredCover> mirrored = mirroredCovers(groups.values());
 
         Map<String, String> covers = new HashMap<>();
         wanted.forEach((asked, ref) -> {
             ReleaseGroupEntity group = groups.get(ref);
-            String cover = group == null ? null : mirrored.get(group.getId());
-            String answer = cover != null ? cover : archiveCover(ref);
+            MirroredCover cover = group == null ? null : mirrored.get(group.getId());
+            String answer = preferredCover(cover, archiveCover(ref));
             if (answer != null) {
                 covers.put(asked, answer);
             }
@@ -454,13 +458,22 @@ public class MetadataService {
     }
 
     /**
+     * A cover the mirror holds for an album, and whether anything has confirmed it renders.
+     *
+     * <p>The difference decides whether it is worth using at all. A Cover Art Archive URL is
+     * built from a release mbid and exists whether or not the archive holds any bytes, so an
+     * unprobed pressing's address is a guess -- and around four in ten of them are wrong.
+     */
+    private record MirroredCover(String url, boolean confirmed) {}
+
+    /**
      * The best cover the mirror holds per album.
      *
      * <p>"Best" is a definite yes ahead of a not-yet-asked, because a release the archive has
      * confirmed art for will render and an unprobed one is a guess. Ties resolve by external
      * id so the same album does not change picture between two identical requests.
      */
-    private Map<UUID, String> mirroredCovers(Collection<ReleaseGroupEntity> groups) {
+    private Map<UUID, MirroredCover> mirroredCovers(Collection<ReleaseGroupEntity> groups) {
         if (groups.isEmpty()) {
             return Map.of();
         }
@@ -478,9 +491,33 @@ public class MetadataService {
                     (current, candidate) -> best.compare(candidate, current) < 0 ? candidate : current);
         }
 
-        Map<UUID, String> covers = new HashMap<>();
-        chosen.forEach((groupId, release) -> covers.put(groupId, release.getCoverArtUrl()));
+        Map<UUID, MirroredCover> covers = new HashMap<>();
+        chosen.forEach((groupId, release) -> covers.put(groupId,
+                new MirroredCover(release.getCoverArtUrl(), Boolean.TRUE.equals(release.getHasCoverArt()))));
         return covers;
+    }
+
+    /**
+     * Which of the two answers to draw an album with.
+     *
+     * <p>A pressing the archive has confirmed art for wins outright. After that the album's
+     * own address beats an unprobed pressing's, and that order is the whole point: the Cover
+     * Art Archive resolves a release *group* to whichever release in it actually has a
+     * picture, so it succeeds whenever any pressing does, while one unprobed pressing's URL
+     * is a coin flip on that pressing alone. Getting this backwards is why an album with two
+     * dozen illustrated pressings could draw an empty square -- reported on the examples
+     * plate, which is the first screen a new account sees.
+     *
+     * <p>An unprobed pressing is still better than nothing, so it stays as the last answer.
+     */
+    private static String preferredCover(MirroredCover mirrored, String albumOwn) {
+        if (mirrored != null && mirrored.confirmed()) {
+            return mirrored.url();
+        }
+        if (albumOwn != null) {
+            return albumOwn;
+        }
+        return mirrored == null ? null : mirrored.url();
     }
 
     /** The Cover Art Archive's own answer for an album, which only MusicBrainz albums have. */
