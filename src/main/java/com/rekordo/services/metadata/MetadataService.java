@@ -1,6 +1,7 @@
 package com.rekordo.services.metadata;
 
 import com.rekordo.client.CoverArtClient;
+import com.rekordo.client.CoverProbe;
 import com.rekordo.client.DiscogsClient;
 import com.rekordo.client.DiscogsResponses;
 import com.rekordo.client.MusicBrainzClient;
@@ -839,12 +840,23 @@ public class MetadataService {
      * The fetch answers both questions at once, so a release that reaches here stops being
      * "unknown" either way — that is what lets the search-persisted rows, which MusicBrainz
      * never told us about, eventually get a truthful answer.
+     *
+     * Only when the archive actually answered, though. A probe that could not be reached
+     * leaves the row exactly as it was, because "we could not ask" is not "there is none".
      */
     private void applyCoverPalette(ReleaseEntity entity) {
-        Optional<byte[]> thumbnail = fetchCoverThumbnail(entity);
-        entity.setHasCoverArt(thumbnail.isPresent());
+        CoverProbe probe = fetchCoverThumbnail(entity);
+        if (!probe.conclusive()) {
+            // Nobody answered, so nothing is known that was not known before. Writing "no
+            // cover" here is what took the picture off records for good: the flag is served
+            // as a null URL, and every client that refreshed its catalogue cache dropped the
+            // artwork with it. The next lookup asks again.
+            log.debug("Cover probe for {} did not come back; the answer stays open", entity.getExternalId());
+            return;
+        }
+        entity.setHasCoverArt(probe.found());
 
-        thumbnail.flatMap(colorExtractor::extract).ifPresentOrElse(palette -> {
+        probe.image().flatMap(colorExtractor::extract).ifPresentOrElse(palette -> {
             entity.setDominantColor(palette.dominantColor());
             entity.setAccentColor(palette.accentColor());
             entity.setLightness(palette.lightness());
@@ -864,7 +876,7 @@ public class MetadataService {
      * for ever, and every single detail open re-ran the lookup that was meant to happen
      * once. Search results are Discogs-first, so that was most of the collection.
      */
-    private Optional<byte[]> fetchCoverThumbnail(ReleaseEntity entity) {
+    private CoverProbe fetchCoverThumbnail(ReleaseEntity entity) {
         ExternalRef ref = ExternalRef.parse(entity.getExternalId());
         if (ref.source() == ReleaseSource.MUSICBRAINZ) {
             return coverArtClient.fetchThumbnail(ref.id());

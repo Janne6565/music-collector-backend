@@ -185,22 +185,33 @@ public class DiscogsClient {
      * The bytes behind one Discogs image URL, for palette sampling.
      *
      * Not paced: these live on Discogs' image CDN rather than the API host, so they do not
-     * spend the per-minute quota the pacer is protecting. A cover that will not load is an
-     * answer — empty — rather than a failure, exactly as on the Cover Art Archive side.
+     * spend the per-minute quota the pacer is protecting. A cover the CDN says is not there
+     * is an answer — absent — while a CDN that throttles or times out is not an answer about
+     * this release at all, and saying so is what keeps a bad minute from taking the picture
+     * off a record for good. See {@link CoverProbe}.
      */
-    public Optional<byte[]> fetchImage(String url) {
+    public CoverProbe fetchImage(String url) {
         if (!isUsable(url)) {
-            return Optional.empty();
+            // No address to ask: this pressing has no cover, and no amount of retrying finds one.
+            return CoverProbe.absent();
         }
         try {
-            return Optional.ofNullable(restClient
+            byte[] bytes = restClient
                     .get()
                     .uri(java.net.URI.create(url))
                     .retrieve()
-                    .body(byte[].class));
-        } catch (RestClientException | IllegalArgumentException e) {
-            log.debug("Could not fetch Discogs image {} ({})", url, e.getMessage());
-            return Optional.empty();
+                    .body(byte[].class);
+            return bytes == null ? CoverProbe.absent() : CoverProbe.found(bytes);
+        } catch (HttpClientErrorException.NotFound | HttpClientErrorException.Gone e) {
+            log.debug("Discogs image {} is gone", url);
+            return CoverProbe.absent();
+        } catch (IllegalArgumentException e) {
+            // Not a URL at all, so there is nothing behind it and never will be.
+            log.debug("Discogs image url {} is not an address ({})", url, e.getMessage());
+            return CoverProbe.absent();
+        } catch (RestClientException e) {
+            log.debug("Could not reach Discogs image {} ({})", url, e.getMessage());
+            return CoverProbe.unreachable();
         }
     }
 
